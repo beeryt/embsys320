@@ -10,6 +10,11 @@
  */
 void FaultPrint(uint32_t pc, uint32_t lr)
 {
-    // TODO: Print an error message specifying the PC and LR values when the fault occurred
-    // <Your code here>
+    // Print an error message specifying the PC and LR values when the fault occurred
+    PrintString("Hard fault at PC=0x");
+    PrintHex(pc);
+    PrintString(" LR=0x");
+    PrintHex(lr);
+    PrintString("\n");
+    // TODO: print R0-R3, R12, PSR
 }

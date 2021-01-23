@@ -31,9 +31,8 @@ void GenerateFault()
         while (1);
     }
 
-    /* TODO: Modify the code to cause a data fetch bus fault by reading */
-    /* memory at an invalid address. */
-    int *a = (int*) 0x20000000;
+    // Cause a data fetch bus fault by reading memory at invalid address
+    int *a = (int*) 0xFFFFFFFF;
     int b = *a;
     b = b; // This line just avoids a compiler warning
 
