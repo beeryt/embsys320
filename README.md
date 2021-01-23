@@ -1,5 +1,6 @@
-# embsys320
-General Repositiory for EMBSYS 320
+# EMBSYS 320 - Certificate in Embedded and Real-Time Systems
+### University of Washington
 
+## Assignments
 
-See also [embsys310](github.com/beeryt/embsys310)
+### [Assignment 1 - uDebugger](uDebugger)
