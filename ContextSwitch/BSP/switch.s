@@ -3,6 +3,7 @@
     EXTERN scheduler
 
     PUBLIC TaskSwitch
+    PUBLIC testAndSet
 
 EXC_RETURN_THREAD_MODE EQU 0xFFFFFFF9
 
@@ -64,5 +65,17 @@ TaskSwitch
     // registers R0-R3, R12, LR, PC and xPSR
     BX LR
 
+testAndSet
+    MOV R1, R0                  // shuffle input to simplify output
+    LDREX R0, [R1]              // Read current value of provided lock
+    DMB
+    CBNZ R0, testComplete       // if, non-zero, return non-zero
+    MOV R2, #1
+    STREX R0, R2, [R1]          // Attempt to set provided lock
+    DMB
+testComplete
+    BX LR                       // Returns 0 if successfully set
+                                //         1 if previously set
+                                //         1 if failed to set
 
     END

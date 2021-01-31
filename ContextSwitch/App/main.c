@@ -10,6 +10,10 @@
 #include "print.h"
 #include "stack.h"
 
+// handle critical section
+uint32_t gLock = 0;
+extern uint32_t testAndSet(uint32_t *lock);
+
 char clr_scrn[] = { 27, 91, 50, 74, 0 };              // esc[2J
 /* Public variables ----------------------------------------------------------*/
 PRINT_DEFINEBUFFER();           /* required for lightweight sprintf */
@@ -47,9 +51,17 @@ void taskOne(void)
 	int count = 0;
 	while(1)
 	{
+		// acquire resource
+		while (testAndSet(&gLock) != 0); // spin
+
+		// critical section
 		PrintString("task one: ");
 		Print_uint32(count++);
 		PrintString("\n");
+
+		// release resource
+		gLock = 0;
+
 		int i;
 		for(i=0;i<100000;i++);    // delay
 	}
@@ -64,9 +76,17 @@ void taskTwo(void)
 	int count = 0xFFFFFFFF;
 	while(1)
 	{
+		// acquire resource
+		while (testAndSet(&gLock) != 0); // spin
+
+		// critical section
 		PrintString("task two: ");
 		Print_uint32(count--);
 		PrintString("\n");
+
+		// release resource
+		gLock = 0;
+
 		int i;
 		for(i=0;i<100000;i++);    // delay
 	}
