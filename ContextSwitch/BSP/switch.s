@@ -32,24 +32,33 @@ EXC_RETURN_THREAD_MODE EQU 0xFFFFFFF9
  */
 TaskSwitch
     // Disable interrupts
+    CPSID i
 
     // Save registers R4-R11 using register SP
+    PUSH { R4, R5, R6, R7, R8, R9, R10, R11 }
 
     // Set up argument for procedure call by copying SP to R0
+    MOV R0, SP
 
     // Call scheduler(uint_32 sp) to save the current SP and determine the next
     // value of currentSP. It takes its input argument sp from R0.
+    BL scheduler
 
     // Load address of currentSP into R0
+    LDR R0, =currentSP
 
     // Load the value of currentSP into SP
+    LDR SP, [R0]
 
     // Load registers R4-R11 using SP
+    POP { R4, R5, R6, R7, R8, R9, R10, R11 }
 
     // Ensure that we return from exception Handler Mode to Thread Mode by
     // loading the value EXC_RETURN_THREAD_MODE into LR
+    LDR LR, =EXC_RETURN_THREAD_MODE
 
     // Enable interrupts
+    CPSIE i
 
     // Branch using LR to return from exception while atomically restoring
     // registers R0-R3, R12, LR, PC and xPSR
