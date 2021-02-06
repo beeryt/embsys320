@@ -5,3 +5,4 @@
 
 ### [Assignment 1 - uDebugger](uDebugger)
 ### [Assignment 2 - ContextSwitch](ContextSwitch)
+### [Assignment 3 - uCosPortHW](uCosPortHW)
