@@ -99,20 +99,20 @@ EXC_RET_MSP_THREAD EQU     0xFFFFFFF9                              ; Exception r
 
 OS_CPU_SR_Save
     // Capture current interrupt enable/disable status (PRIMASK)
-    // <Your code here>
-    
+    MRS R0, PRIMASK
+
     // Disable interrupts
-    // <Your code here>
-    
+    CPSID i
+
     // Return captured interrupt enable/disable status
-    // <Your code here>
+    BX LR
 
 OS_CPU_SR_Restore
     // Restore argument in R0 to PRIMASK
-    // <Your code here>
-    
+    MSR PRIMASK, R0
+
     // Return
-    // <Your code here>
+    BX LR
 
 
 ;********************************************************************************************************
@@ -195,48 +195,60 @@ OSIntCtxSw
 
 ContextSwitch
     // Disable interrupts
-    // <Your code here>
-    
+    CPSID i
+
     // For the initial context switch we must not save the context.
     // To ensure this, PSP is used as a flag to indicate the initial context 
     // switch.
     // See OSStartHighRdy for flag setup.
     
     // Copy process stack pointer to R0
-    // <Your code here>
-    
+    MRS R0, PSP
+
     // Subtract 4 and set APSR flags
-    // <Your code here>
-    
-    // If R0==0 use conditional execution to set PSP to 0 and branch to 
+    SUBS R0, #4
+
+    // If R0==0 use conditional execution to set PSP to 0 and branch to
     // ContextSwitch_AfterSave
-    // <Your code here>
+    ITT EQ
+    MSREQ PSP, R0
+    BEQ ContextSwitch_AfterSave
 
     // Save R4-R11 to main stack
-    // <Your code here>
+    PUSH { R4, R5, R6, R7, R8, R9, R10, R11 }
 
     // OSTCBCur->OSTCBStkPtr = SP
-    // <Your code here>
+    LDR R1, =OSTCBCur
+    LDR R1, [R1]
+    STR SP, [R1]
 
     // At this point, entire context of task has been saved
     
 ContextSwitch_AfterSave
 
     // Call OSTaskSwHook();
-    // <Your code here>
+    BL OSTaskSwHook
 
     // OSPrioCur = OSPrioHighRdy;
-    // <Your code here>
+    LDR R0, =OSPrioCur
+    LDR R1, =OSPrioHighRdy
+    LDRB R1, [R1]
+    STRB R1, [R0]
 
     // OSTCBCur  = OSTCBHighRdy;
-    // <Your code here>
+    LDR R0, =OSTCBCur
+    LDR R1, =OSTCBHighRdy
+    LDR R1, [R1]
+    STR R1, [R0]
 
     // SP = OSTCBHighRdy->OSTCBStkPtr;
-    // <Your code here>
-    
+    LDR R1, =OSTCBHighRdy
+    LDR R1, [R1]
+    LDR SP, [R1]
+
     // Restore R4-R11
-    // <Your code here>
-    
+    POP { R4, R5, R6, R7, R8, R9, R10, R11 }
+
     // Ensure exception returns to Thread Mode and MSP
     MOV     LR, #EXC_RET_MSP_THREAD
     
