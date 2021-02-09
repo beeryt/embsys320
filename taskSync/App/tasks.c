@@ -22,6 +22,7 @@ History:
 #include "print.h"
 
 #define BUFSIZE 150
+#define TIMEOUT 200
 
 #define TASKLOOPLIMIT 5
 
@@ -100,16 +101,21 @@ void StartupTask(void* pdata)
 
     printWithBuf(buf, BUFSIZE, "StartupTask: Creating application tasks\n");
 
-    // TODO semPrint 01: add code here to create semaphore semPrint as a binary semaphore
+    // create semephore semPrint as a binary semaphore
+    semPrint = OSSemCreate(1);
 
-    // TODO Mailbox 01: add code here to create 2 mailboxes mboxA and mboxB, initially empty
+    // create two mailboxes (mboxA, mboxB), initially empty
+    mboxA = OSMboxCreate(NULL);
+    mboxB = OSMboxCreate(NULL);
 
-    // TODO Queue 01: add code here to create qMsg as a uCOS queue that uses qMsgVPtrs to store queue entry pointers
+    // create qMsg as a uCOS queue that uses qMsgVPtrs to store queue entry pointers
+    qMsg = OSQCreate(qMsgVPtrs, QMAXENTRIES);
 
-    // TODO Queue 02: add code here to create qMsgMemPart as a uCOS memory partition containing a pool
-    // of QMAXENTRIES messages where each entry is of type QMsg_t
+    // create qMsgMemPart as a uCOS memory partition containing a pool of messages where each entry is of type QMsg_t
+    qMsgMemPart = OSMemCreate(qMsgBlocks, QMAXENTRIES, sizeof(QMsg_t), &err);
 
-    // TODO EventFlags 01: add code here to create event flag 'group' rxFlags
+    // create event flag 'group' rxFlags
+    rxFlags = OSFlagCreate(0, &err);
 
     // The maximum of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
     INT8U pri = APP_TASK_START_PRIO + 1;
@@ -154,11 +160,13 @@ void TaskMBTx(void* pdata)
 
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-        // TODO Mailbox 02: add code here to send msgA[i] to TaskMBRxA using mailbox mboxA
+        // send msgA[i] to TaskMBRxA using mailbox mboxA
+        OSMboxPost(mboxA, msgA[i]);
 
         OSTimeDly(90);
 
-        // TODO Mailbox 03: add code here to send msgB[i] to TaskMBRxB using mailbox mboxB
+        // send msgB[i] to TaskMBRxB using mailbox mboxB
+        OSMboxPost(mboxB, msgB[i]);
 
         OSTimeDly(90);
     }
@@ -187,10 +195,11 @@ void TaskMBRxA(void* pdata)
     int i;
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-        // TODO EventFlags 02: add code here to wait on bit 0 in rxFlags till TaskRxFlags clears it,
-        // indicating it is OK to receive the next message
+        // wait on bit 0 in rxFlags until TaskRxFlags clears it, indicating OK to receive next message
+        OSFlagPend(rxFlags, 0x1, OS_FLAG_WAIT_CLR_ALL, TIMEOUT, &err);
 
-        // TODO Mailbox 04: add code here to receive a message in msgReceived from mailbox mboxA
+        // receive a message in msgReceived from mailbox mboxA
+        msgReceived = OSMboxPend(mboxA, TIMEOUT, &err);
 
         TaskMBRxA_msgCount += 1;
         expected[1] = '0' + (i % 10);
@@ -199,8 +208,8 @@ void TaskMBRxA(void* pdata)
             errorCount += 1;
         }
 
-        // TODO EventFlags 03: add code here to set bit 0 in rxFlags, indicating to TaskRxFlags
-        // that we have finished receiving a message
+        // set bit 0 in rxFlags, indicating to TaskRxFlags that we have finished receiving a message
+        OSFlagPost(rxFlags, 0x1, OS_FLAG_SET, &err);
 
         printWithBuf(buf, BUFSIZE, "TaskMBRxA: actual=%s, expected=%s, received=%d errors=%d\n",
                      msgReceived, expected, TaskMBRxA_msgCount, errorCount);
@@ -234,10 +243,11 @@ void TaskMBRxB(void* pdata)
     int i;
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-        // TODO EventFlags 04: add code here to wait on bit 1 in rxFlags till TaskRxFlags clears it,
-        // indicating it is OK to receive the next message
+        // wait on bit 1 in rxFlags until TaskRxFlags clears it, indicating it is OK to receive next message
+        OSFlagPend(rxFlags, 0x2, OS_FLAG_WAIT_CLR_ALL, TIMEOUT, &err);
 
-        // TODO Mailbox 05: add code here to receive a message in msgReceived from mboxB
+        // receive a message in msgReceived from mboxB
+        msgReceived = OSMboxPend(mboxB, TIMEOUT, &err);
 
         TaskMBRxB_msgCount += 1;
         expected[1] = '0' + (i % 10);
@@ -246,8 +256,8 @@ void TaskMBRxB(void* pdata)
             errorCount += 1;
         }
 
-        // TODO EventFlags 05: add code here to set bit 1 in rxFlags, indicating to TaskRxFlags
-        // that we have finished receiving a message
+        // set bit 1 in rxFlags, indicating to TaskRxFlags that we have finished receiving a message
+        OSFlagPost(rxFlags, 0x2, OS_FLAG_SET, &err);
 
         printWithBuf(buf, BUFSIZE, "TaskMBRxB: actual=%s, expected=%s, received=%d errors=%d\n",
                      msgReceived, expected, TaskMBRxB_msgCount, errorCount);
@@ -284,24 +294,24 @@ void TaskQTxA(void* pdata)
 
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-//        // allocate a queue entry
-//        pQmsgToSend = (QMsg_t*) OSMemGet(qMsgMemPart, &err);
-//        if (err != OS_ERR_NONE)
-//        {
-//            printWithBuf(buf, BUFSIZE, "Not enough message blocks");
-//            while (OS_TRUE);
-//        }
-//
-//        pQmsgToSend->msg = (char*)msg[i];
-//        err = OS_ERR_NONE;
-//        do
-//        {
-//            OSTimeDly(5);
-//
-//            // TODO Queue 03: first uncomment this code block (highlight and hit Ctrl-Shift-K)
-//            // then add code here to send pQmsgToSend to TaskQRx using qMsg
-//
-//        } while (err == OS_ERR_Q_FULL);
+       // allocate a queue entry
+       pQmsgToSend = (QMsg_t*) OSMemGet(qMsgMemPart, &err);
+       if (err != OS_ERR_NONE)
+       {
+           printWithBuf(buf, BUFSIZE, "Not enough message blocks");
+           while (OS_TRUE);
+       }
+
+       pQmsgToSend->msg = (char*)msg[i];
+       err = OS_ERR_NONE;
+       do
+       {
+           OSTimeDly(5);
+
+           // send pQmsgToSend to TaskQRx using qMsg
+           err = OSQPost(qMsg, pQmsgToSend);
+
+       } while (err == OS_ERR_Q_FULL);
 
         printWithBuf(buf, BUFSIZE, "TaskQTxA: sent msg %s\n", msg[i]);
 
@@ -336,23 +346,23 @@ void TaskQTxB(void* pdata)
 
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-//        // allocate a queue entry
-//        QMsg_t *pQmsgToSend = OSMemGet(qMsgMemPart, &err);
-//        if (err != OS_ERR_NONE)
-//        {
-//            printWithBuf(buf, BUFSIZE, "Not enough message blocks");
-//            while (OS_TRUE);
-//        }
-//
-//        pQmsgToSend->msg = (char*)msg[i];
-//        do
-//        {
-//            OSTimeDly(5);
-//
-//            // TODO Queue 04: first uncomment this code block (highlight and hit Ctrl-Shift-K)
-//            // then add code here to send pQmsgToSend to TaskQRx using qMsg
-//
-//        } while (err == OS_ERR_Q_FULL);
+       // allocate a queue entry
+       QMsg_t *pQmsgToSend = OSMemGet(qMsgMemPart, &err);
+       if (err != OS_ERR_NONE)
+       {
+           printWithBuf(buf, BUFSIZE, "Not enough message blocks");
+           while (OS_TRUE);
+       }
+
+       pQmsgToSend->msg = (char*)msg[i];
+       do
+       {
+           OSTimeDly(5);
+
+           // send pQmsgToSend to TaskQRx using qMsg
+           err = OSQPost(qMsg, pQmsgToSend);
+
+       } while (err == OS_ERR_Q_FULL);
 
         printWithBuf(buf, BUFSIZE, "TaskQTxB: sent msg %s\n", msg[i]);
 
@@ -393,13 +403,13 @@ void TaskQRx(void* pdata)
     // Receive messages from 2 tasks hence cycle TASKLOOPLIMIT twice
     for (i = 0; i < TASKLOOPLIMIT * 2; i++)
     {
-//        // TODO Queue 05: first uncomment this code block (highlight and hit Ctrl-Shift-K)
-//        // then add code here to receive a message in pQMsgReceived from qMsg
-//
-//        memcpy(msgReceived, pQMsgReceived->msg, 3);
-//
-//        // free the queue msg so it can be reused
-//        OSMemPut(qMsgMemPart, pQMsgReceived);
+       // receive a message in pQMsgReceived from qMsg
+       pQMsgReceived = OSQPend(qMsg, TIMEOUT, &err);
+
+       memcpy(msgReceived, pQMsgReceived->msg, 3);
+
+       // free the queue msg so it can be reused
+       OSMemPut(qMsgMemPart, pQMsgReceived);
 
         printWithBuf(buf, BUFSIZE, "TaskQRx: received msg %s\n", msgReceived);
 
@@ -463,8 +473,8 @@ void TaskRxFlags(void* pdata)
     int i;
     for (i = 1; i <= TASKLOOPLIMIT; i++)
     {
-        // TODO EventFlags 06: add code here to wait for both TaskMBRxA and TaskMBRxB to signal that they have
-        // received a message
+        // wait for both TaskMBRxA and TaskMBRxB to signal that they have received a message
+        OSFlagPend(rxFlags, 0x3, OS_FLAG_WAIT_SET_ALL, TIMEOUT, &err);
 
         isError = (i != TaskMBRxA_msgCount) || (i != TaskMBRxB_msgCount);
         if (isError && !iError)
@@ -476,8 +486,8 @@ void TaskRxFlags(void* pdata)
                      "TaskRxFlags: (TaskMBRxA_msgCount expected=%d actual=%d) (TaskMBRxB_msgCount expected=%d actual=%d)\n",
                      i, TaskMBRxA_msgCount, i, TaskMBRxB_msgCount);
 
-        // TODO EventFlags 07: add code here to signal to both TaskMBRxA and TaskMBRxB that they can
-        // go ahead and receive their next message.
+        // signal to both TaskMBRxA and TaskMBRxB that they can receive their next message
+        OSFlagPost(rxFlags, 0x3, OS_FLAG_CLR, &err);
 
         OSTimeDly(10);
     }
@@ -508,9 +518,10 @@ void printWithBuf(char *buf, int size, char *format, ...)
     va_start(args, format);
     vsnprintf(buf, size, format, args);
 
-    // TODO semPrint 02: place the call to PrintString in a critical section using semaphore semPrint
-
+    // call PrintString in a critical section using semaphore semPrint
+    OSSemPend(semPrint, TIMEOUT, &err);
     PrintString(buf);
+    OSSemPost(semPrint);
 
     va_end(args);
 }
