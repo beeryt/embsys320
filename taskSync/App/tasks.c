@@ -66,7 +66,7 @@ OS_EVENT * mboxB;
 
 typedef struct                   // a queue entry
 {
-	char *msg;
+    char *msg;
 }QMsg_t;
 
 OS_EVENT * qMsg;                 // pointer to a uCOS message queue
@@ -89,11 +89,11 @@ INT32U TaskMBRxB_msgCount = 0;
 ************************************************************************************/
 void StartupTask(void* pdata)
 {
-	INT8U err;
+    INT8U err;
 
-	char buf[BUFSIZE];
-	printWithBuf(buf, BUFSIZE, "StartupTask: Begin\n");
-	printWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
+    char buf[BUFSIZE];
+    printWithBuf(buf, BUFSIZE, "StartupTask: Begin\n");
+    printWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
 
     // Start the system tick
     SetSysTick(OS_TICKS_PER_SEC);
@@ -102,17 +102,17 @@ void StartupTask(void* pdata)
 
     // TODO semPrint 01: add code here to create semaphore semPrint as a binary semaphore
 
-	// TODO Mailbox 01: add code here to create 2 mailboxes mboxA and mboxB, initially empty
+    // TODO Mailbox 01: add code here to create 2 mailboxes mboxA and mboxB, initially empty
 
-	// TODO Queue 01: add code here to create qMsg as a uCOS queue that uses qMsgVPtrs to store queue entry pointers
+    // TODO Queue 01: add code here to create qMsg as a uCOS queue that uses qMsgVPtrs to store queue entry pointers
 
-	// TODO Queue 02: add code here to create qMsgMemPart as a uCOS memory partition containing a pool
-	// of QMAXENTRIES messages where each entry is of type QMsg_t
+    // TODO Queue 02: add code here to create qMsgMemPart as a uCOS memory partition containing a pool
+    // of QMAXENTRIES messages where each entry is of type QMsg_t
 
-	// TODO EventFlags 01: add code here to create event flag 'group' rxFlags
+    // TODO EventFlags 01: add code here to create event flag 'group' rxFlags
 
     // The maximum of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
-	INT8U pri = APP_TASK_START_PRIO + 1;
+    INT8U pri = APP_TASK_START_PRIO + 1;
     OSTaskCreate(TaskMBTx, (void*)0, (void*)&TaskMBTxStk[APP_CFG_TASK_START_STK_SIZE-1], pri++);
     OSTaskCreate(TaskMBRxA, (void*)0, (void*)&TaskMBRxAStk[APP_CFG_TASK_START_STK_SIZE-1], pri++);
     OSTaskCreate(TaskMBRxB, (void*)0, (void*)&TaskMBRxBStk[APP_CFG_TASK_START_STK_SIZE-1], pri++);
@@ -123,7 +123,7 @@ void StartupTask(void* pdata)
 
     // Delete ourselves, letting the work be done in the new tasks.
     printWithBuf(buf, BUFSIZE, "StartupTask: deleting self\n");
-	OSTaskDel(OS_PRIO_SELF);
+    OSTaskDel(OS_PRIO_SELF);
 }
 
 /************************************************************************************
@@ -134,31 +134,31 @@ TaskMBTx sends messages to TaskMBRxA and TaskMBRxB.
 
 void TaskMBTx(void* pdata)
 {
-	char buf[BUFSIZE];
-	printWithBuf(buf, BUFSIZE, "TaskMBTx: starting\n");
+    char buf[BUFSIZE];
+    printWithBuf(buf, BUFSIZE, "TaskMBTx: starting\n");
 
-	char msgA[TASKLOOPLIMIT][3] = {{0}};
-	char msgB[TASKLOOPLIMIT][3] = {{0}};
+    char msgA[TASKLOOPLIMIT][3] = {{0}};
+    char msgB[TASKLOOPLIMIT][3] = {{0}};
 
-	// initialize a set of 2-character null-terminated string messages to send to other tasks
-	int i;
-	for (i = 0; i < TASKLOOPLIMIT; i++)
-	{
-		msgA[i][0] = 'A';
-		msgA[i][1] = '0' + (i % 10);
+    // initialize a set of 2-character null-terminated string messages to send to other tasks
+    int i;
+    for (i = 0; i < TASKLOOPLIMIT; i++)
+    {
+        msgA[i][0] = 'A';
+        msgA[i][1] = '0' + (i % 10);
 
-		msgB[i][0] = 'B';
-		msgB[i][1] = '0' + (i % 10);
-	}
+        msgB[i][0] = 'B';
+        msgB[i][1] = '0' + (i % 10);
+    }
 
 
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-    	// TODO Mailbox 02: add code here to send msgA[i] to TaskMBRxA using mailbox mboxA
+        // TODO Mailbox 02: add code here to send msgA[i] to TaskMBRxA using mailbox mboxA
 
         OSTimeDly(90);
 
-    	// TODO Mailbox 03: add code here to send msgB[i] to TaskMBRxB using mailbox mboxB
+        // TODO Mailbox 03: add code here to send msgB[i] to TaskMBRxB using mailbox mboxB
 
         OSTimeDly(90);
     }
@@ -174,40 +174,40 @@ TaskMBRxA receives messages sent to it by TaskMBTx.
 
 void TaskMBRxA(void* pdata)
 {
-	INT8U err;
-	char buf[BUFSIZE];
-	uint32_t errorCount = 0;
-	const char *DummyMsg = "XX";
+    INT8U err;
+    char buf[BUFSIZE];
+    uint32_t errorCount = 0;
+    const char *DummyMsg = "XX";
 
-	char expected[3] = {"AA"};
-	char *msgReceived = (char*) DummyMsg;
+    char expected[3] = {"AA"};
+    char *msgReceived = (char*) DummyMsg;
 
-	printWithBuf(buf, BUFSIZE, "TaskMBRxA: starting\n");
+    printWithBuf(buf, BUFSIZE, "TaskMBRxA: starting\n");
 
-	int i;
+    int i;
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-    	// TODO EventFlags 02: add code here to wait on bit 0 in rxFlags till TaskRxFlags clears it,
-    	// indicating it is OK to receive the next message
+        // TODO EventFlags 02: add code here to wait on bit 0 in rxFlags till TaskRxFlags clears it,
+        // indicating it is OK to receive the next message
 
-    	// TODO Mailbox 04: add code here to receive a message in msgReceived from mailbox mboxA
+        // TODO Mailbox 04: add code here to receive a message in msgReceived from mailbox mboxA
 
-    	TaskMBRxA_msgCount += 1;
-    	expected[1] = '0' + (i % 10);
-    	if (strcmp(msgReceived, expected))
-    	{
-    		errorCount += 1;
-    	}
+        TaskMBRxA_msgCount += 1;
+        expected[1] = '0' + (i % 10);
+        if (strcmp(msgReceived, expected))
+        {
+            errorCount += 1;
+        }
 
-    	// TODO EventFlags 03: add code here to set bit 0 in rxFlags, indicating to TaskRxFlags
-    	// that we have finished receiving a message
+        // TODO EventFlags 03: add code here to set bit 0 in rxFlags, indicating to TaskRxFlags
+        // that we have finished receiving a message
 
-    	printWithBuf(buf, BUFSIZE, "TaskMBRxA: actual=%s, expected=%s, received=%d errors=%d\n",
-    			msgReceived, expected, TaskMBRxA_msgCount, errorCount);
-    	OSTimeDly(30);
+        printWithBuf(buf, BUFSIZE, "TaskMBRxA: actual=%s, expected=%s, received=%d errors=%d\n",
+                     msgReceived, expected, TaskMBRxA_msgCount, errorCount);
+        OSTimeDly(30);
     }
     printWithBuf(buf, BUFSIZE, "%sTaskMBRxA: Done! Received %d messages, errors=%d\n",
-		errorCount > 0 ? "**ERROR:" : "", TASKLOOPLIMIT, errorCount);
+                 errorCount > 0 ? "**ERROR:" : "", TASKLOOPLIMIT, errorCount);
     while (1) OSTimeDly(1000);
 }
 
@@ -221,40 +221,40 @@ TaskMBRxB receives messages sent to it by TaskMBTx.
 
 void TaskMBRxB(void* pdata)
 {
-	INT8U err;
-	char buf[BUFSIZE];
-	uint32_t errorCount = 0;
-	const char *DummyMsg = "XX";
+    INT8U err;
+    char buf[BUFSIZE];
+    uint32_t errorCount = 0;
+    const char *DummyMsg = "XX";
 
-	char expected[3] = {"BB"};
-	char *msgReceived = (char*) DummyMsg;
+    char expected[3] = {"BB"};
+    char *msgReceived = (char*) DummyMsg;
 
-	printWithBuf(buf, BUFSIZE, "TaskMBRxB: starting\n");
+    printWithBuf(buf, BUFSIZE, "TaskMBRxB: starting\n");
 
-	int i;
+    int i;
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-    	// TODO EventFlags 04: add code here to wait on bit 1 in rxFlags till TaskRxFlags clears it,
-    	// indicating it is OK to receive the next message
+        // TODO EventFlags 04: add code here to wait on bit 1 in rxFlags till TaskRxFlags clears it,
+        // indicating it is OK to receive the next message
 
-    	// TODO Mailbox 05: add code here to receive a message in msgReceived from mboxB
+        // TODO Mailbox 05: add code here to receive a message in msgReceived from mboxB
 
-    	TaskMBRxB_msgCount += 1;
-    	expected[1] = '0' + (i % 10);
-    	if (strcmp(msgReceived, expected))
-    	{
-    		errorCount += 1;
-    	}
+        TaskMBRxB_msgCount += 1;
+        expected[1] = '0' + (i % 10);
+        if (strcmp(msgReceived, expected))
+        {
+            errorCount += 1;
+        }
 
-    	// TODO EventFlags 05: add code here to set bit 1 in rxFlags, indicating to TaskRxFlags
-    	// that we have finished receiving a message
+        // TODO EventFlags 05: add code here to set bit 1 in rxFlags, indicating to TaskRxFlags
+        // that we have finished receiving a message
 
-    	printWithBuf(buf, BUFSIZE, "TaskMBRxB: actual=%s, expected=%s, received=%d errors=%d\n",
-    			msgReceived, expected, TaskMBRxB_msgCount, errorCount);
-    	OSTimeDly(10);
+        printWithBuf(buf, BUFSIZE, "TaskMBRxB: actual=%s, expected=%s, received=%d errors=%d\n",
+                     msgReceived, expected, TaskMBRxB_msgCount, errorCount);
+        OSTimeDly(10);
     }
     printWithBuf(buf, BUFSIZE, "%sTaskMBRxB: Done! received %d messages, errors=%d\n",
-		errorCount > 0 ? "**ERROR:" : "", TASKLOOPLIMIT, errorCount);
+                 errorCount > 0 ? "**ERROR:" : "", TASKLOOPLIMIT, errorCount);
     while (1) OSTimeDly(1000);
 }
 
@@ -266,42 +266,42 @@ TaskQTxA sends messages to TaskQRx.
 
 void TaskQTxA(void* pdata)
 {
-	INT8U err;
-	char buf[BUFSIZE];
-	QMsg_t *pQmsgToSend;
+    INT8U err;
+    char buf[BUFSIZE];
+    QMsg_t *pQmsgToSend;
 
-	printWithBuf(buf, BUFSIZE, "TaskQTxA: starting\n");
+    printWithBuf(buf, BUFSIZE, "TaskQTxA: starting\n");
 
-	char msg[TASKLOOPLIMIT][3] = {{0}};
+    char msg[TASKLOOPLIMIT][3] = {{0}};
 
-	// initialize a set of 2-character null-terminated string messages to send to other tasks
-	int i;
-	for (i = 0; i < TASKLOOPLIMIT; i++)
-	{
-		msg[i][0] = 'A';
-		msg[i][1] = '0' + (i % 10);
-	}
+    // initialize a set of 2-character null-terminated string messages to send to other tasks
+    int i;
+    for (i = 0; i < TASKLOOPLIMIT; i++)
+    {
+        msg[i][0] = 'A';
+        msg[i][1] = '0' + (i % 10);
+    }
 
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-//		// allocate a queue entry
-//		pQmsgToSend = (QMsg_t*) OSMemGet(qMsgMemPart, &err);
-//		if (err != OS_ERR_NONE)
-//		{
-//			printWithBuf(buf, BUFSIZE, "Not enough message blocks");
-//			while (OS_TRUE);
-//		}
+//        // allocate a queue entry
+//        pQmsgToSend = (QMsg_t*) OSMemGet(qMsgMemPart, &err);
+//        if (err != OS_ERR_NONE)
+//        {
+//            printWithBuf(buf, BUFSIZE, "Not enough message blocks");
+//            while (OS_TRUE);
+//        }
 //
-//		pQmsgToSend->msg = (char*)msg[i];
-//		err = OS_ERR_NONE;
-//		do
-//		{
-//			OSTimeDly(5);
+//        pQmsgToSend->msg = (char*)msg[i];
+//        err = OS_ERR_NONE;
+//        do
+//        {
+//            OSTimeDly(5);
 //
-//			// TODO Queue 03: first uncomment this code block (highlight and hit Ctrl-Shift-K)
-//    	    // then add code here to send pQmsgToSend to TaskQRx using qMsg
+//            // TODO Queue 03: first uncomment this code block (highlight and hit Ctrl-Shift-K)
+//            // then add code here to send pQmsgToSend to TaskQRx using qMsg
 //
-//		} while (err == OS_ERR_Q_FULL);
+//        } while (err == OS_ERR_Q_FULL);
 
         printWithBuf(buf, BUFSIZE, "TaskQTxA: sent msg %s\n", msg[i]);
 
@@ -320,41 +320,41 @@ TaskQTxB sends messages to TaskQRx.
 
 void TaskQTxB(void* pdata)
 {
-	INT8U err;
-	char buf[BUFSIZE];
-	printWithBuf(buf, BUFSIZE, "TaskQTxB: starting\n");
+    INT8U err;
+    char buf[BUFSIZE];
+    printWithBuf(buf, BUFSIZE, "TaskQTxB: starting\n");
 
-	char msg[TASKLOOPLIMIT][3] = {{0}};
+    char msg[TASKLOOPLIMIT][3] = {{0}};
 
-	// initialize a set of 2-character null-terminated string messages to send to other tasks
-	int i;
-	for (i = 0; i < TASKLOOPLIMIT; i++)
-	{
-		msg[i][0] = 'B';
-		msg[i][1] = '0' + (i % 10);
-	}
+    // initialize a set of 2-character null-terminated string messages to send to other tasks
+    int i;
+    for (i = 0; i < TASKLOOPLIMIT; i++)
+    {
+        msg[i][0] = 'B';
+        msg[i][1] = '0' + (i % 10);
+    }
 
     for (i = 0; i < TASKLOOPLIMIT; i++)
     {
-//		// allocate a queue entry
-//		QMsg_t *pQmsgToSend = OSMemGet(qMsgMemPart, &err);
-//		if (err != OS_ERR_NONE)
-//		{
-//			printWithBuf(buf, BUFSIZE, "Not enough message blocks");
-//			while (OS_TRUE);
-//		}
+//        // allocate a queue entry
+//        QMsg_t *pQmsgToSend = OSMemGet(qMsgMemPart, &err);
+//        if (err != OS_ERR_NONE)
+//        {
+//            printWithBuf(buf, BUFSIZE, "Not enough message blocks");
+//            while (OS_TRUE);
+//        }
 //
-//		pQmsgToSend->msg = (char*)msg[i];
-//		do
-//		{
-//			OSTimeDly(5);
+//        pQmsgToSend->msg = (char*)msg[i];
+//        do
+//        {
+//            OSTimeDly(5);
 //
-//			// TODO Queue 04: first uncomment this code block (highlight and hit Ctrl-Shift-K)
-//    	    // then add code here to send pQmsgToSend to TaskQRx using qMsg
+//            // TODO Queue 04: first uncomment this code block (highlight and hit Ctrl-Shift-K)
+//            // then add code here to send pQmsgToSend to TaskQRx using qMsg
 //
-//		} while (err == OS_ERR_Q_FULL);
+//        } while (err == OS_ERR_Q_FULL);
 
-		printWithBuf(buf, BUFSIZE, "TaskQTxB: sent msg %s\n", msg[i]);
+        printWithBuf(buf, BUFSIZE, "TaskQTxB: sent msg %s\n", msg[i]);
 
         OSTimeDly(30);
     }
@@ -370,75 +370,75 @@ TaskQRx receives messages from TaskQTxA and TaskQTxB.
 
 void TaskQRx(void* pdata)
 {
-	INT8U err;
-	char buf[BUFSIZE];
-	char expectedMsg[2 * TASKLOOPLIMIT][3] = {{0}};
-	INT32U msgCount[2 * TASKLOOPLIMIT] = {0};
-	BOOLEAN isError = OS_FALSE;
-	QMsg_t *pQMsgReceived;
-	char msgReceived[3] = {"XX"};
+    INT8U err;
+    char buf[BUFSIZE];
+    char expectedMsg[2 * TASKLOOPLIMIT][3] = {{0}};
+    INT32U msgCount[2 * TASKLOOPLIMIT] = {0};
+    BOOLEAN isError = OS_FALSE;
+    QMsg_t *pQMsgReceived;
+    char msgReceived[3] = {"XX"};
 
-	printWithBuf(buf, BUFSIZE, "TaskQRx: starting\n");
+    printWithBuf(buf, BUFSIZE, "TaskQRx: starting\n");
 
-	// initialize a set of expected 2-character null-terminated string messages we should receive
-	int i;
-	for (i = 0; i < TASKLOOPLIMIT; i++)
-	{
-		expectedMsg[i][0] = 'A';
-		expectedMsg[i][1] = '0' + (i % 10);
-		expectedMsg[i+TASKLOOPLIMIT][0] = 'B';
-		expectedMsg[i+TASKLOOPLIMIT][1] = '0' + (i % 10);
-	}
+    // initialize a set of expected 2-character null-terminated string messages we should receive
+    int i;
+    for (i = 0; i < TASKLOOPLIMIT; i++)
+    {
+        expectedMsg[i][0] = 'A';
+        expectedMsg[i][1] = '0' + (i % 10);
+        expectedMsg[i+TASKLOOPLIMIT][0] = 'B';
+        expectedMsg[i+TASKLOOPLIMIT][1] = '0' + (i % 10);
+    }
 
-	// Receive messages from 2 tasks hence cycle TASKLOOPLIMIT twice
+    // Receive messages from 2 tasks hence cycle TASKLOOPLIMIT twice
     for (i = 0; i < TASKLOOPLIMIT * 2; i++)
     {
-//    	// TODO Queue 05: first uncomment this code block (highlight and hit Ctrl-Shift-K)
-//    	// then add code here to receive a message in pQMsgReceived from qMsg
+//        // TODO Queue 05: first uncomment this code block (highlight and hit Ctrl-Shift-K)
+//        // then add code here to receive a message in pQMsgReceived from qMsg
 //
-//    	memcpy(msgReceived, pQMsgReceived->msg, 3);
+//        memcpy(msgReceived, pQMsgReceived->msg, 3);
 //
-//		// free the queue msg so it can be reused
-//		OSMemPut(qMsgMemPart, pQMsgReceived);
+//        // free the queue msg so it can be reused
+//        OSMemPut(qMsgMemPart, pQMsgReceived);
 
-		printWithBuf(buf, BUFSIZE, "TaskQRx: received msg %s\n", msgReceived);
+        printWithBuf(buf, BUFSIZE, "TaskQRx: received msg %s\n", msgReceived);
 
- 		// Verify that we received one of the expected messages
- 		int j;
- 		for (j = 0; j < 2 * TASKLOOPLIMIT; j++)
- 		{
- 			if (!strcmp(msgReceived, expectedMsg[j]))
- 			{
- 				msgCount[j]++;
- 				if (msgCount[j] > 1)
- 				{
- 					isError = OS_TRUE;
- 				}
- 				break;
- 			}
- 		}
- 		if (j == 2 * TASKLOOPLIMIT)
- 		{
- 			isError = OS_TRUE;
- 		}
+         // Verify that we received one of the expected messages
+         int j;
+         for (j = 0; j < 2 * TASKLOOPLIMIT; j++)
+         {
+             if (!strcmp(msgReceived, expectedMsg[j]))
+             {
+                 msgCount[j]++;
+                 if (msgCount[j] > 1)
+                 {
+                     isError = OS_TRUE;
+                 }
+                 break;
+             }
+         }
+         if (j == 2 * TASKLOOPLIMIT)
+         {
+             isError = OS_TRUE;
+         }
 
-		OSTimeDly(10);
+        OSTimeDly(10);
     }
     if (isError)
     {
-    	for (i = 0; i < 2 * TASKLOOPLIMIT; i++)
-    	{
-    		if (msgCount[i] != 1)
-    		{
-    	    	printWithBuf(buf, BUFSIZE,
-					"**ERROR: TaskQRx: msg=%s: expected to receive 1 instance, actual=%d\n", expectedMsg[i], msgCount[i]);
-    		}
-    	}
+        for (i = 0; i < 2 * TASKLOOPLIMIT; i++)
+        {
+            if (msgCount[i] != 1)
+            {
+                printWithBuf(buf, BUFSIZE,
+                             "**ERROR: TaskQRx: msg=%s: expected to receive 1 instance, actual=%d\n", expectedMsg[i], msgCount[i]);
+            }
+        }
     }
     else
     {
-		printWithBuf(buf, BUFSIZE, "TaskQRx: Done! Received %d/%d messages.\n",
-			2 * TASKLOOPLIMIT, 2 * TASKLOOPLIMIT);
+        printWithBuf(buf, BUFSIZE, "TaskQRx: Done! Received %d/%d messages.\n",
+                     2 * TASKLOOPLIMIT, 2 * TASKLOOPLIMIT);
     }
     while (1) OSTimeDly(1000);
 }
@@ -453,43 +453,43 @@ before either can receive their next message.
 
 void TaskRxFlags(void* pdata)
 {
-	INT8U err;
-	INT8U iError = 0;
-	char buf[BUFSIZE];
-	BOOLEAN isError = OS_FALSE;
+    INT8U err;
+    INT8U iError = 0;
+    char buf[BUFSIZE];
+    BOOLEAN isError = OS_FALSE;
 
-	printWithBuf(buf, BUFSIZE, "TaskRxFlags: starting\n");
+    printWithBuf(buf, BUFSIZE, "TaskRxFlags: starting\n");
 
-	int i;
+    int i;
     for (i = 1; i <= TASKLOOPLIMIT; i++)
     {
-    	// TODO EventFlags 06: add code here to wait for both TaskMBRxA and TaskMBRxB to signal that they have
-    	// received a message
+        // TODO EventFlags 06: add code here to wait for both TaskMBRxA and TaskMBRxB to signal that they have
+        // received a message
 
-    	isError = (i != TaskMBRxA_msgCount) || (i != TaskMBRxB_msgCount);
-    	if (isError && !iError)
-    	{
-    		iError = i;
-    	}
+        isError = (i != TaskMBRxA_msgCount) || (i != TaskMBRxB_msgCount);
+        if (isError && !iError)
+        {
+            iError = i;
+        }
 
-    	printWithBuf(buf, BUFSIZE,
-			"TaskRxFlags: (TaskMBRxA_msgCount expected=%d actual=%d) (TaskMBRxB_msgCount expected=%d actual=%d)\n",
-			i, TaskMBRxA_msgCount, i, TaskMBRxB_msgCount);
+        printWithBuf(buf, BUFSIZE,
+                     "TaskRxFlags: (TaskMBRxA_msgCount expected=%d actual=%d) (TaskMBRxB_msgCount expected=%d actual=%d)\n",
+                     i, TaskMBRxA_msgCount, i, TaskMBRxB_msgCount);
 
-    	// TODO EventFlags 07: add code here to signal to both TaskMBRxA and TaskMBRxB that they can
-    	// go ahead and receive their next message.
+        // TODO EventFlags 07: add code here to signal to both TaskMBRxA and TaskMBRxB that they can
+        // go ahead and receive their next message.
 
-    	OSTimeDly(10);
+        OSTimeDly(10);
     }
     if (iError)
     {
-    	printWithBuf(buf, BUFSIZE, "**ERROR: TaskRxFlags: Done! Out of sync beginning at message %d\n", iError);
+        printWithBuf(buf, BUFSIZE, "**ERROR: TaskRxFlags: Done! Out of sync beginning at message %d\n", iError);
     }
     else
     {
-    	printWithBuf(buf, BUFSIZE,
-			"TaskRxFlags: Done! (TaskMBRxA_msgCount expected=%d actual=%d) (TaskMBRxB_msgCount expected=%d actual=%d)\n",
-			i-1, TaskMBRxA_msgCount, i-1, TaskMBRxB_msgCount);
+        printWithBuf(buf, BUFSIZE,
+                     "TaskRxFlags: Done! (TaskMBRxA_msgCount expected=%d actual=%d) (TaskMBRxB_msgCount expected=%d actual=%d)\n",
+                     i-1, TaskMBRxA_msgCount, i-1, TaskMBRxB_msgCount);
     }
     while (1) OSTimeDly(1000);
 }
@@ -503,7 +503,7 @@ void TaskRxFlags(void* pdata)
 ************************************************************************************/
 void printWithBuf(char *buf, int size, char *format, ...)
 {
-	INT8U err;
+    INT8U err;
     va_list args;
     va_start(args, format);
     vsnprintf(buf, size, format, args);
