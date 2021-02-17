@@ -4,7 +4,7 @@
     Board support for controlling the ILI9341 LCD on the Adafruit '2.8" TFT LCD w/Cap Touch' via NUCLEO-F401RE MCU
 
     Developed for University of Washington embedded systems programming certificate
-    
+
     2016/2 Nick Strathy wrote/arranged it
 */
 
@@ -27,6 +27,7 @@
 #define LCD_ILI9341_DC_HIGH()       LL_GPIO_SetOutputPin(LCD_ILI9341_DC_GPIO, LCD_ILI9341_DC_GPIO_Pin);
 
 #define LCD_SPI_DEVICE_ID  PJDF_DEVICE_ID_SPI1
+#define LCD_I2C_DEVICE_ID  PJDF_DEVICE_ID_I2C1
 
 #define LCD_SPI_DATARATE  LL_SPI_BAUDRATEPRESCALER_DIV2  // Tune to find optimal value LCD controller will work with. OK with 16MHz and 80MHzHCLK
 

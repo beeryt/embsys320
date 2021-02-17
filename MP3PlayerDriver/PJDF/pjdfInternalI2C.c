@@ -43,15 +43,41 @@ static PjdfErrCode CloseI2C(DriverInternal *pDriver)
 // Reads data from the peripheral device over the I2C interface.
 //
 // pDriver: pointer to an initialized I2C device
-// pBuffer: on entry the first byte contains the starting address on the 
+// pBuffer: on entry the first byte contains the starting address on the
 //     peripheral to read from. After reading, contains the bytes that were read.
 // pCount: the number of bytes to read.
 // Returns: PJDF_ERR_NONE if there was no error, otherwise an error code.
 static PjdfErrCode ReadI2C(DriverInternal *pDriver, void* pBuffer, INT32U* pCount)
 {
-  // DRIVER TODO
-  // <your code here>
-  return PJDF_ERR_NONE;
+    uint8_t err;
+    PjdfContextI2c* pContext = (PjdfContextI2c*)pDriver->deviceContext;
+    uint8_t* buffer = (uint8_t*)pBuffer;
+    uint32_t count = *pCount;
+
+    // obtain driver semaphore for the resource
+    OSSemPend(pDriver->sem, 0, &err);
+    if (err != OS_ERR_NONE) {
+        *pCount = 0;
+        return PJDF_ERR_DEVICE_NOT_INIT;
+    }
+
+    // initiate an i2c read
+    I2C_start(pContext->i2cMemMap, pContext->i2CDevAddr << 1, LL_I2C_GENERATE_START_WRITE, 1);
+    I2C_write(pContext->i2cMemMap, buffer[0]);
+    BspI2c_WaitWithTimeoutReset(LL_I2C_IsActiveFlag_STOP, 1);
+    I2C_start(pContext->i2cMemMap, pContext->i2CDevAddr << 1, LL_I2C_GENERATE_START_READ, count);
+
+    // read i2c data into buffer
+    uint8_t i;
+    for (i = 0; i < count - 1; ++i) {
+        buffer[i] = I2C_read_ack(pContext->i2cMemMap);
+    }
+    buffer[i] = I2C_read_nack(pContext->i2cMemMap);
+    BspI2c_WaitWithTimeoutReset(LL_I2C_IsActiveFlag_STOP, 1);
+
+    // release driver semaphore when complete
+    OSSemPost(pDriver->sem);
+    return PJDF_ERR_NONE;
 }
 
 
@@ -66,9 +92,34 @@ static PjdfErrCode ReadI2C(DriverInternal *pDriver, void* pBuffer, INT32U* pCoun
 // Returns: PJDF_ERR_NONE if there was no error, otherwise an error code.
 static PjdfErrCode WriteI2C(DriverInternal *pDriver, void* pBuffer, INT32U* pCount)
 {
-  // DRIVER TODO
-  // <your code here>
-  return PJDF_ERR_NONE;
+    uint8_t err;
+    PjdfContextI2c* pContext = (PjdfContextI2c*)pDriver->deviceContext;
+    uint8_t* buffer = (uint8_t*)pBuffer;
+    uint32_t count = *pCount;
+
+    // obtain driver semaphore for the resource
+    OSSemPend(pDriver->sem, 0, &err);
+    if (err != OS_ERR_NONE) {
+        return PJDF_ERR_DEVICE_NOT_INIT;
+    }
+
+    // initiate an i2c write
+    LL_I2C_ClearFlag_STOP(pContext->i2cMemMap);
+    I2C_start(pContext->i2cMemMap, pContext->i2CDevAddr << 1, LL_I2C_GENERATE_START_WRITE, 1);
+    I2C_write(pContext->i2cMemMap, buffer[0]);
+    BspI2c_WaitWithTimeoutReset(LL_I2C_IsActiveFlag_STOP, 1);
+
+    // write buffer data to i2c
+    LL_I2C_ClearFlag_STOP(pContext->i2cMemMap);
+    I2C_start(pContext->i2cMemMap, pContext->i2CDevAddr << 1, LL_I2C_GENERATE_START_WRITE, count - 1);
+    for (int i = 1; i < count; ++i) { // start at 1
+        I2C_write(pContext->i2cMemMap, buffer[i]);
+    }
+    BspI2c_WaitWithTimeoutReset(LL_I2C_IsActiveFlag_STOP, 1);
+
+    // release driver semaphore when complete
+    OSSemPost(pDriver->sem);
+    return PJDF_ERR_NONE;
 }
 
 // IoctlI2C
@@ -94,24 +145,22 @@ static PjdfErrCode IoctlI2C(DriverInternal *pDriver, INT8U request, void* pArgs,
 PjdfErrCode InitI2C(DriverInternal *pDriver, char *pName)
 {
     if (strcmp (pName, pDriver->pName) != 0) while(1); // pName should have been initialized in driversInternal[] declaration
-    
-    // Initialize semaphore for serializing operations on the device 
-    pDriver->sem = OSSemCreate(1); 
+
+    // Initialize semaphore for serializing operations on the device
+    pDriver->sem = OSSemCreate(1);
     if (pDriver->sem == NULL) while (1);  // not enough semaphores available
     pDriver->refCount = 0; // initial number of Open handles to the device
 
     // We may choose to handle multiple hardware instances of the I2C interface
     // each of which gets its own DriverInternal struct. Here we initialize
     // the context of the I2C hardware instance specified by pName.
-    // DRIVER TODO
-    // Uncomment the following if block:
-//    if (strcmp(pName, PJDF_DEVICE_ID_I2C1) == 0)
-//    {
-//        pDriver->maxRefCount = 1; // Maximum refcount allowed for the device
-//        pDriver->deviceContext = (void*) &i2c1Context;
-//        BspI2C1_init(); // init I2C1 hardware
-//    }
-  
+   if (strcmp(pName, PJDF_DEVICE_ID_I2C1) == 0)
+   {
+       pDriver->maxRefCount = 1; // Maximum refcount allowed for the device
+       pDriver->deviceContext = (void*) &i2c1Context;
+       BspI2C1_init(); // init I2C1 hardware
+   }
+
     // Assign implemented functions to the interface pointers
     pDriver->Open = OpenI2C;
     pDriver->Close = CloseI2C;
