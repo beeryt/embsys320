@@ -7,3 +7,4 @@
 ### [Assignment 2 - ContextSwitch](ContextSwitch)
 ### [Assignment 3 - uCosPortHW](uCosPortHW)
 ### [Assignment 4 - taskSync](taskSync)
+### [Assignment 5 - MP3PlayerDriver](MP3PlayerDriver)
