@@ -4,7 +4,7 @@
     This is the implementation of the pjdf.h driver interface exposed to applications.
 
     Developed for University of Washington embedded systems programming certificate
-    
+
     2016/2 Nick Strathy wrote/arranged it after a framework by Paul Lever
 */
 
@@ -35,7 +35,7 @@ static DriverInternal driversInternal[MAXDEVICES] =
 // pName: the identifier of the device chosen from PJDF_DEVICE_IDS.
 // flags: a device-defined bit string used to configure options of the device
 // Returns: if no error occured, a valid handle is returned which may be used to
-//    operate on the device. If an error occurs, an error code is returned. 
+//    operate on the device. If an error occurs, an error code is returned.
 //    Valid handles are positive numbers; error codes are negative numbers.
 HANDLE Open(char *pName, INT8U flags)
 {
@@ -43,7 +43,7 @@ HANDLE Open(char *pName, INT8U flags)
     int i;
     DriverInternal *pDriver;
     INT8U osErr;
-    
+
     for (i = 0, pDriver = &driversInternal[0]; i < MAXDEVICES; i++, pDriver++)
     {
         if (strcmp(pName, pDriver->pName) == 0)
@@ -63,7 +63,7 @@ HANDLE Open(char *pName, INT8U flags)
                 OSSemPost(pDriver->sem);
                 break;
             }
-            
+
             // Call the Open() function of the device
             retval = pDriver->Open(pDriver, flags);
             if (PJDF_IS_ERROR(retval))
@@ -92,24 +92,24 @@ PjdfErrCode Close(HANDLE handle)
     PjdfErrCode retval;
     DriverInternal *pDriver;
     INT8U osErr;
-    
+
     if (handle <= 0 || handle > MAXDEVICES)
     {
         retval = PJDF_ERR_INVALID_HANDLE;
         while (1);
     }
-    
+
     pDriver = &driversInternal[handle-1];
     if (!pDriver->initialized)
     {
         retval = PJDF_ERR_DEVICE_NOT_INIT;
         while (1);
     }
-    
+
     // Enter a critical section to call device specific Close() and decrement the device reference count
     OSSemPend(pDriver->sem, 0, &osErr);
     if (osErr != OS_ERR_NONE) while (1);
-    
+
     if (pDriver->refCount == 0)
     {
         retval = PJDF_ERR_DEVICE_NOT_OPEN;
@@ -123,7 +123,7 @@ PjdfErrCode Close(HANDLE handle)
     {
         pDriver->refCount -= 1;
     }
-    
+
     OSSemPost(pDriver->sem);
     return retval;
 }
@@ -137,7 +137,7 @@ PjdfErrCode Read(HANDLE handle, void* pBuffer, INT32U* pLength)
         retval = PJDF_ERR_INVALID_HANDLE;
         while (1);
     }
-    
+
     pDriver = &driversInternal[handle-1];
     if (!pDriver->initialized)
     {
@@ -157,7 +157,7 @@ PjdfErrCode Write(HANDLE handle, void* pBuffer, INT32U* pLength)
         retval = PJDF_ERR_INVALID_HANDLE;
         while (1);
     }
-    
+
     pDriver = &driversInternal[handle-1];
     if (!pDriver->initialized)
     {
@@ -177,7 +177,7 @@ PjdfErrCode Ioctl(HANDLE handle, INT8U request, void* pArgs, INT32U* pSize)
         retval = PJDF_ERR_INVALID_HANDLE;
         while (1);
     }
-    
+
     pDriver = &driversInternal[handle-1];
     if (!pDriver->initialized)
     {
@@ -193,13 +193,13 @@ PjdfErrCode Ioctl(HANDLE handle, INT8U request, void* pArgs, INT32U* pSize)
 // Initialize the device driver framework.
 // Calls the Init function of each driver in driversInternal.
 //
-// The purpose of this function is to put the driver framework in a valid initial 
+// The purpose of this function is to put the driver framework in a valid initial
 // state before applications start to use it.
 //
 // We initialize the hardware for the devices and ensure that statically
 // allocated device driver memory is properly initialized. Embedded device
-// drivers do not typically use dynamically allocated (heap) memory, instead all of 
-// their memory is allocated at compile time and we now initialize 
+// drivers do not typically use dynamically allocated (heap) memory, instead all of
+// their memory is allocated at compile time and we now initialize
 // that memory before the drivers are exposed to applications.
 PjdfErrCode InitPjdf()
 {
@@ -212,6 +212,6 @@ PjdfErrCode InitPjdf()
             while (1); // a driver Init() function failed
         }
     }
-    
+
     return retval;
 }

@@ -10,7 +10,7 @@ Module Description:
 
     The tasks that are executed by the test application.
 
-2016/2 Nick Strathy adapted it for NUCLEO-F401RE 
+2016/2 Nick Strathy adapted it for NUCLEO-F401RE
 
 ************************************************************************************/
 #include <stdarg.h>
@@ -49,7 +49,7 @@ long MapTouchToScreen(long x, long in_min, long in_max, long out_min, long out_m
 static OS_STK   LcdTouchDemoTaskStk[APP_CFG_TASK_START_STK_SIZE];
 static OS_STK   Mp3DemoTaskStk[APP_CFG_TASK_START_STK_SIZE];
 
-     
+
 // Task prototypes
 void LcdTouchDemoTask(void* pdata);
 void Mp3DemoTask(void* pdata);
@@ -82,7 +82,7 @@ void StartupTask(void* pdata)
 
     // Start the system tick
     SetSysTick(OS_TICKS_PER_SEC);
-    
+
     // Initialize SD card
     PrintWithBuf(buf, PRINTBUFMAX, "Opening handle to SD driver: %s\n", PJDF_DEVICE_ID_SD_ADAFRUIT);
     hSD = Open(PJDF_DEVICE_ID_SD_ADAFRUIT, 0);
@@ -91,11 +91,11 @@ void StartupTask(void* pdata)
 
     PrintWithBuf(buf, PRINTBUFMAX, "Opening SD SPI driver: %s\n", SD_SPI_DEVICE_ID);
     // We talk to the SD controller over a SPI interface therefore
-    // open an instance of that SPI driver and pass the handle to 
+    // open an instance of that SPI driver and pass the handle to
     // the SD driver.
     hSPI = Open(SD_SPI_DEVICE_ID, 0);
     if (!PJDF_IS_VALID_HANDLE(hSPI)) while(1);
-    
+
     length = sizeof(HANDLE);
     pjdfErr = Ioctl(hSD, PJDF_CTRL_SD_SET_SPI_HANDLE, &hSPI, &length);
     if(PJDF_IS_ERROR(pjdfErr)) while(1);
@@ -116,15 +116,15 @@ static void DrawLcdContents()
 {
     char buf[BUFSIZE];
     OS_CPU_SR cpu_sr;
-    
+
     // allow slow lower pri drawing operation to finish without preemption
-    OS_ENTER_CRITICAL(); 
-    
+    OS_ENTER_CRITICAL();
+
     lcdCtrl.fillScreen(ILI9341_BLACK);
-    
+
     // Print a message on the LCD
     lcdCtrl.setCursor(40, 60);
-    lcdCtrl.setTextColor(ILI9341_WHITE);  
+    lcdCtrl.setTextColor(ILI9341_WHITE);
     lcdCtrl.setTextSize(2);
     PrintToLcdWithBuf(buf, BUFSIZE, "Hello World!");
 
@@ -152,7 +152,7 @@ void LcdTouchDemoTask(void* pdata)
 
 	PrintWithBuf(buf, BUFSIZE, "Opening LCD SPI driver: %s\n", LCD_SPI_DEVICE_ID);
     // We talk to the LCD controller over a SPI interface therefore
-    // open an instance of that SPI driver and pass the handle to 
+    // open an instance of that SPI driver and pass the handle to
     // the LCD driver.
     HANDLE hSPI = Open(LCD_SPI_DEVICE_ID, 0);
     if (!PJDF_IS_VALID_HANDLE(hSPI)) while(1);
@@ -181,32 +181,32 @@ void LcdTouchDemoTask(void* pdata)
         PrintWithBuf(buf, BUFSIZE, "Couldn't start FT6206 touchscreen controller\n");
         while (1);
     }
-    
+
     int currentcolor = ILI9341_RED;
 
-    while (1) { 
+    while (1) {
         boolean touched;
-        
+
         touched = touchCtrl.touched();
-        
+
         if (! touched) {
             OSTimeDly(5);
             continue;
         }
-        
+
         TS_Point point;
-        
+
         point = touchCtrl.getPoint();
         if (point.x == 0 && point.y == 0)
         {
             continue; // usually spurious, so ignore
         }
-        
+
         // transform touch orientation to screen orientation.
         TS_Point p = TS_Point();
         p.x = MapTouchToScreen(point.x, 0, ILI9341_TFTWIDTH, ILI9341_TFTWIDTH, 0);
         p.y = MapTouchToScreen(point.y, 0, ILI9341_TFTHEIGHT, ILI9341_TFTHEIGHT, 0);
-        
+
         lcdCtrl.fillCircle(p.x, p.y, PENRADIUS, currentcolor);
     }
 }
@@ -219,7 +219,7 @@ void Mp3DemoTask(void* pdata)
 {
     PjdfErrCode pjdfErr;
     INT32U length;
-    
+
     char buf[BUFSIZE];
     PrintWithBuf(buf, BUFSIZE, "Mp3DemoTask: starting\n");
 
@@ -230,7 +230,7 @@ void Mp3DemoTask(void* pdata)
 
 	PrintWithBuf(buf, BUFSIZE, "Opening MP3 SPI driver: %s\n", MP3_SPI_DEVICE_ID);
     // We talk to the MP3 decoder over a SPI interface therefore
-    // open an instance of that SPI driver and pass the handle to 
+    // open an instance of that SPI driver and pass the handle to
     // the MP3 driver.
     HANDLE hSPI = Open(MP3_SPI_DEVICE_ID, 0);
     if (!PJDF_IS_VALID_HANDLE(hSPI)) while(1);
@@ -243,12 +243,12 @@ void Mp3DemoTask(void* pdata)
 	PrintWithBuf(buf, BUFSIZE, "Starting MP3 device test\n");
     Mp3Init(hMp3);
     int count = 0;
-    
+
     while (1)
     {
         OSTimeDly(500);
         PrintWithBuf(buf, BUFSIZE, "Begin streaming sound file  count=%d\n", ++count);
-        Mp3Stream(hMp3, (INT8U*)Train_Crossing, sizeof(Train_Crossing)); 
+        Mp3Stream(hMp3, (INT8U*)Train_Crossing, sizeof(Train_Crossing));
         PrintWithBuf(buf, BUFSIZE, "Done streaming sound file  count=%d\n", count);
     }
 }

@@ -4,10 +4,10 @@
     This header is the main application interface of the PJ Driver Framework.
 
     Developed for University of Washington embedded systems programming certificate
-    
+
     2016/2 Nick Strathy wrote/arranged it after a framework by Paul Lever
 */
- 
+
 #ifndef __PJDF_H__
 #define __PJDF_H__
 
@@ -37,7 +37,7 @@ typedef INT8S HANDLE;
 #define PJDF_DEVICE_ID_MP3_VS1053   "/dev/mp3_vs1053"
 #define PJDF_DEVICE_ID_LCD_ILI9341   "/dev/lcd_ili9341"
 #define PJDF_DEVICE_ID_SD_ADAFRUIT   "/dev/sd_adafruit"
-     
+
 #define PJDF_DEVICE_IDS \
         PJDF_DEVICE_ID_SPI1, \
         PJDF_DEVICE_ID_MP3_VS1053, \
@@ -47,7 +47,7 @@ typedef INT8S HANDLE;
 // Driver error codes
 // Definition: all driver error codes are negative numbers except PJDF_ERR_NONE.
 #define PJDF_IS_ERROR(x) (x < 0)
-           
+
 typedef INT8S PjdfErrCode;
 #define PJDF_ERR_NONE  0
 #define PJDF_ERR_DEVICE_NOT_FOUND -1  // Search for a given device failed to find it

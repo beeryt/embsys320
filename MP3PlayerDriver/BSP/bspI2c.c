@@ -4,10 +4,10 @@
     Board support for controlling I2C interfaces
 
     Adapted for University of Washington embedded systems programming certificate
-    
+
     2016/2 Nick Strathy adapted it
     2020/8 Nick Strathy adapted it for ST32L475VGT6
-  
+
 */
 
 #include "bsp.h"
@@ -75,22 +75,22 @@ void BspI2C1_init(void)
 // value is 0 or 1 and represents the desired active state to wait for. 0 means inactive, 1 means active.
 void BspI2c_WaitWithTimeoutReset(uint32_t (*IsActive)(I2C_TypeDef *I2Cx), uint32_t value) {
   int32_t timeoutCount = MAX_TIMEOUT_ITERATIONS;
-  
+
   if (value) {
     while (!(*IsActive)(I2C1) && --timeoutCount);
   } else {
     while ((*IsActive)(I2C1) && --timeoutCount);
   }
 
-  if (timeoutCount <= 0) 
+  if (timeoutCount <= 0)
     BspI2C1_init();
 }
 
 
 
-/* This function issues a start condition and 
+/* This function issues a start condition and
  * transmits the slave address + R/W bit
- * 
+ *
  * Parameters:
  * 		I2Cx --> the I2C peripheral e.g. I2C1
  * 		address --> the 7 bit slave address
@@ -100,12 +100,12 @@ void BspI2c_WaitWithTimeoutReset(uint32_t (*IsActive)(I2C_TypeDef *I2Cx), uint32
  */
 void I2C_start(I2C_TypeDef* I2Cx, uint8_t address, uint32_t direction, uint8_t nBytes){
   BspI2c_WaitWithTimeoutReset(LL_I2C_IsActiveFlag_BUSY, 0);
-  LL_I2C_HandleTransfer(I2Cx, address, LL_I2C_ADDRSLAVE_7BIT, (uint32_t)nBytes, LL_I2C_MODE_AUTOEND, direction);  
+  LL_I2C_HandleTransfer(I2Cx, address, LL_I2C_ADDRSLAVE_7BIT, (uint32_t)nBytes, LL_I2C_MODE_AUTOEND, direction);
 }
 
 /* This function transmits one byte to the slave device
  * Parameters:
- *		I2Cx --> the I2C peripheral e.g. I2C1 
+ *		I2Cx --> the I2C peripheral e.g. I2C1
  *		data --> the data byte to be transmitted
  */
 void I2C_write(I2C_TypeDef* I2Cx, uint8_t data)
@@ -117,7 +117,7 @@ void I2C_write(I2C_TypeDef* I2Cx, uint8_t data)
 }
 
 /* This function reads one byte from the slave device.
- * I2C_start must be called first to set up the read. If the NBYTE register 
+ * I2C_start must be called first to set up the read. If the NBYTE register
  * of the specified I2C device becomes 0, a NACK is sent to the slave after
  * the read, otherwise, ACK is sent.
  */
@@ -130,7 +130,7 @@ uint8_t I2C_read_ack(I2C_TypeDef* I2Cx){
 }
 
 /* This function reads one byte from the slave device
- * and doesn't acknowledge the received data 
+ * and doesn't acknowledge the received data
  * after that a STOP condition is transmitted
  */
 uint8_t I2C_read_nack(I2C_TypeDef* I2Cx){

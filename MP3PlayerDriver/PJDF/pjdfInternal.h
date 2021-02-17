@@ -3,10 +3,10 @@
     PJDF internal device driver interface for driver developers
 
     Developed for University of Washington embedded systems programming certificate
-    
+
     2016/2 Nick Strathy wrote/arranged it after a framework by Paul Lever
 */
- 
+
 #ifndef __PJDFINTERNAL_H__
 #define __PJDFINTERNAL_H__
 
@@ -20,16 +20,16 @@ typedef struct _DriverInternal DriverInternal; // forward declaration
 struct _DriverInternal
 {
     char *pName;     // name used by applications and internally to identify the device
-    
+
     // Method for initializing the device driver before exposing it to applications
     PjdfErrCode (*Init)(DriverInternal *pDriver, char *pName);
-    
+
     BOOLEAN initialized; // true if Init() ran successfully otherwise false.
-    OS_EVENT *sem;  // semaphore to serialize operations on the device 
+    OS_EVENT *sem;  // semaphore to serialize operations on the device
     INT8U refCount; // current number of Open handles to the device
     INT8U maxRefCount; // Maximum Open handles allowed for the device
     void *deviceContext; // device dependent data
-    
+
     // Device-specific methods for operating on the device
     PjdfErrCode (*Open)(DriverInternal *pDriver, INT8U flags);
     PjdfErrCode (*Close)(DriverInternal *pDriver);

@@ -4,7 +4,7 @@
     Inter-Integrated Circuit (I2C)
 
     Developed for University of Washington embedded systems programming certificate
-    
+
     2018/12 Nick Strathy wrote/arranged it after a framework by Paul Lever
 */
 
@@ -92,16 +92,16 @@ static PjdfErrCode IoctlI2C(DriverInternal *pDriver, INT8U request, void* pArgs,
 
 // Initializes the given I2C driver.
 PjdfErrCode InitI2C(DriverInternal *pDriver, char *pName)
-{   
+{
     if (strcmp (pName, pDriver->pName) != 0) while(1); // pName should have been initialized in driversInternal[] declaration
     
     // Initialize semaphore for serializing operations on the device 
     pDriver->sem = OSSemCreate(1); 
     if (pDriver->sem == NULL) while (1);  // not enough semaphores available
     pDriver->refCount = 0; // initial number of Open handles to the device
-    
+
     // We may choose to handle multiple hardware instances of the I2C interface
-    // each of which gets its own DriverInternal struct. Here we initialize 
+    // each of which gets its own DriverInternal struct. Here we initialize
     // the context of the I2C hardware instance specified by pName.
     // DRIVER TODO
     // Uncomment the following if block:
@@ -118,7 +118,7 @@ PjdfErrCode InitI2C(DriverInternal *pDriver, char *pName)
     pDriver->Read = ReadI2C;
     pDriver->Write = WriteI2C;
     pDriver->Ioctl = IoctlI2C;
-    
+
     pDriver->initialized = OS_TRUE;
     return PJDF_ERR_NONE;
 }
