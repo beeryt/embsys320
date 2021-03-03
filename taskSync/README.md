@@ -1,4 +1,4 @@
-# Assignment 3 - uCosPortHW
+# Assignment 4 - taskSync
 ## [EMBSYS 320 Winter 2021](/../../)
 #### Carl B. Smiley
 
