@@ -1,0 +1,3 @@
+[submodule "Project/App/libui"]
+	path = Project/App/libui
+	url = git@github.com:beeryt/libui.git
