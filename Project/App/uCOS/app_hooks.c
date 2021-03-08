@@ -37,6 +37,7 @@
 */
 
 #include  <ucos_ii.h>
+#include "print.h"
 //#include  <stm32f4xx_hal.h>
 
 
@@ -168,6 +169,19 @@ void  App_TaskIdleHook (void)
 
 void  App_TaskStatHook (void)
 {
+#ifdef PRINT_CPU_AVERAGE
+  char buf[32];
+  static float avgCPU;
+  static bool first = true;
+  if (first) {
+    first = false;
+    avgCPU = OSCPUUsage;
+  }
+
+  const float alpha = 0.9f;
+  avgCPU = alpha * avgCPU + (1.0 - alpha) * OSCPUUsage;
+  PrintWithBuf(buf, sizeof(buf), "CPU Percent: %d.%01d\n", (int)avgCPU, ((int)(avgCPU*10)) % 10);
+#endif
 }
 
 /*

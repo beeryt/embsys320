@@ -139,6 +139,8 @@ void StartupTask(void* pdata)
   // Create the test tasks
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
 
+  OSStatInit();
+
   // The maximum number of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
   for (auto it = tasks.begin(); it != tasks.end(); ++it) {
     OSTaskCreate(it->task, it->arg, it->stack, it->priority);
