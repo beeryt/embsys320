@@ -15,7 +15,7 @@ PjdfErrCode Mp3GetRegister(HANDLE hMp3, INT8U *cmdInDataOut, INT32U bufLen);
 void Mp3Init(HANDLE hMp3);
 void Mp3Test(HANDLE hMp3);
 void Mp3Stream(HANDLE hMp3, INT8U *pBuf, INT32U bufLen);
-void Mp3StreamSDFile(HANDLE hMp3, char *pFilename);
+void Mp3StreamSDFile(HANDLE hMp3, const char *pFilename);
 
 
 #endif

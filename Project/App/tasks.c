@@ -41,7 +41,6 @@ long MapTouchToScreen(long x, long in_min, long in_max, long out_min, long out_m
 static OS_STK   LcdTouchDemoTaskStk[APP_CFG_TASK_START_STK_SIZE];
 static OS_STK   Mp3DemoTaskStk[APP_CFG_TASK_START_STK_SIZE];
 
-
 // Task prototypes
 void LcdTouchDemoTask(void* pdata);
 void Mp3DemoTask(void* pdata);
@@ -50,6 +49,7 @@ void Mp3DemoTask(void* pdata);
 void PrintToLcdWithBuf(char *buf, int size, char *format, ...);
 void DebugSDContents();
 void ListMP3Files();
+void DrawLcdContents();
 
 struct Song {
   std::string filename;
@@ -79,13 +79,11 @@ void StartupTask(void* pdata)
     PrintWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
     SetSysTick(OS_TICKS_PER_SEC);
 
+    // Initialize hardware drivers
     PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializing Hardware\n");
     InitializeSD();
     InitializeLCD(lcdCtrl);
     InitializeTouch(touchCtrl);
-
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
-    DebugSDContents();
 
     // initialize songHeap
     PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializeing Song Heap\n");
@@ -95,6 +93,9 @@ void StartupTask(void* pdata)
       if (uCOSerr != OS_ERR_NONE) while (1);
     }
 
+    // List SD card contents
+    PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
+    DebugSDContents();
     ListMP3Files();
     PrintWithBuf(buf, sizeof(buf), "Songs:\n");
     for (auto it = songs.begin(); it != songs.end(); ++it) {
@@ -111,26 +112,6 @@ void StartupTask(void* pdata)
     // Delete ourselves, letting the work be done in the new tasks.
     PrintWithBuf(buf, BUFSIZE, "StartupTask: deleting self\n");
 	OSTaskDel(OS_PRIO_SELF);
-}
-
-static void DrawLcdContents()
-{
-    char buf[BUFSIZE];
-    OS_CPU_SR cpu_sr;
-
-    // allow slow lower pri drawing operation to finish without preemption
-    OS_ENTER_CRITICAL();
-
-    lcdCtrl.fillScreen(ILI9341_BLACK);
-
-    // Print a message on the LCD
-    lcdCtrl.setCursor(40, 60);
-    lcdCtrl.setTextColor(ILI9341_WHITE);
-    lcdCtrl.setTextSize(2);
-    PrintToLcdWithBuf(buf, BUFSIZE, "Hello World!");
-
-    OS_EXIT_CRITICAL();
-
 }
 
 /************************************************************************************
@@ -185,19 +166,35 @@ void Mp3DemoTask(void* pdata)
     HANDLE hMp3;
     InitializeMP3(hMp3);
 
-    int count = 0;
-
-    while (1)
-    {
+    while (1) {
+      for (auto it = songs.begin(); it != songs.end(); ++it) {
+        const char* filename = (*it)->filename.c_str();
+        PrintWithBuf(buf, sizeof(buf), "Begin streaming sound file: %s\n", filename);
+        Mp3StreamSDFile(hMp3, filename);
         OSTimeDly(500);
-#if 0
-        PrintWithBuf(buf, BUFSIZE, "Begin streaming sound file  count=%d\n", ++count);
-        Mp3Stream(hMp3, (INT8U*)Train_Crossing, sizeof(Train_Crossing));
-        PrintWithBuf(buf, BUFSIZE, "Done streaming sound file  count=%d\n", count);
-#endif
+      }
     }
 }
 
+static void DrawLcdContents()
+{
+    char buf[BUFSIZE];
+    OS_CPU_SR cpu_sr;
+
+    // allow slow lower pri drawing operation to finish without preemption
+    OS_ENTER_CRITICAL();
+
+    lcdCtrl.fillScreen(ILI9341_BLACK);
+
+    // Print a message on the LCD
+    lcdCtrl.setCursor(40, 60);
+    lcdCtrl.setTextColor(ILI9341_WHITE);
+    lcdCtrl.setTextSize(2);
+    PrintToLcdWithBuf(buf, BUFSIZE, "Hello World!");
+
+    OS_EXIT_CRITICAL();
+
+}
 
 // Renders a character at the current cursor position on the LCD
 static void PrintCharToLcd(char c)
@@ -253,7 +250,7 @@ void ListMP3FilesHelper(File dir) {
       if (uCOSerr != OS_ERR_NONE) while (1);
       // populate song fields
       song->filename = std::string{ entry.name() };
-      songs.push_back(song);
+      songs.insert(songs.begin(), song);
       PrintWithBuf(buf, sizeof(buf), "%s\n", entry.name());
     }
     entry.close();
