@@ -23,6 +23,7 @@ Module Description:
 #include "drivers.h"
 
 #include "event.h"
+#include "button.h"
 
 #define PENRADIUS 3
 
@@ -129,7 +130,6 @@ void StartupTask(void* pdata)
 
   // List SD card contents
   PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
-  DebugSDContents();
   ListMP3Files();
   PrintWithBuf(buf, sizeof(buf), "Songs:\n");
   for (auto it = songs.begin(); it != songs.end(); ++it) {
@@ -154,23 +154,58 @@ void StartupTask(void* pdata)
    Runs LCD/Touch demo code
 
 ************************************************************************************/
+Button* bd;
+void onClick() {
+  static char t[32];
+  static unsigned i = 0;
+  snprintf(t, sizeof(t), "Clicked %d times!\n", i++);
+  bd->text.setText(t);
+}
 void LcdDisplayTask(void* pdata)
 {
   INT8U uCOSerr;
   char buf[BUFSIZE];
   PrintWithBuf(buf, BUFSIZE, "LcdDisplayTask: starting\n");
 
+  Button b;
+  bd = &b;
+  b.text.setText("Clicked 0 times!\n");
+  b.text.setTextSize(2);
+  b.setBackground({ 0xEF, 0x00, 0xEF });
+  auto s = b.text.getSize();
+  b.setSize({
+    static_cast<int16_t>(s.x+32),
+    static_cast<int16_t>(s.y+32)
+  });
+  b.text.setPosition({ 16,16 });
+  b.setOnClick(&onClick);
+
+  b.setGFX(&lcdCtrl);
+  PrintWithBuf(buf, sizeof(buf), "(%d,%d)\n", b.getSize().x, b.getSize().y);
+
   DrawLcdContents();
   while (1) {
     // handle all events in eventQueue
     do {
+      // Pop msg from eventQueue
       Event* msg = (Event*)OSQPend(eventQueue, 1, &uCOSerr);
       if (uCOSerr != OS_ERR_NONE) break;
-      PrintWithBuf(buf, sizeof(buf), "Received: %d (%d,%d)\n", msg->type, msg->position.x, msg->position.y);
+
       // TODO: do something with event
+      PrintWithBuf(buf, sizeof(buf), "Received: %d (%d,%d)\n", msg->type, msg->position.x, msg->position.y);
+      b.input(*msg);
+
+      // Free allocated memory
+      uCOSerr = OSMemPut(eventHeap, msg);
+      if (uCOSerr != OS_ERR_NONE) {
+        PrintWithBuf(buf, sizeof(buf), "LcdDisplayTask: eventHeap failure %d\n", uCOSerr);
+        while (1);
+      }
     } while (uCOSerr == OS_ERR_NONE);
 
-    OSTimeDly(1000);
+    b.process();
+
+    OSTimeDly(1);
   }
 }
 
@@ -186,17 +221,25 @@ void TouchInputTask(void* pdata)
     RELEASE
   };
 
-  auto sendEvent = [&](Event::Type type) {
-    INT8U uCOSerr;
-    // Obtain an Event* from eventHeap
-    auto event = static_cast<Event*>(OSMemGet(eventHeap, &uCOSerr));
-    if (uCOSerr != OS_ERR_NONE) return;
-
-    // Prepare event
+  // Convert a TS_Point to a Vec2<int16_t>
+  auto getPoint = [&]() {
     auto point = touchCtrl.getPoint();
     int16_t x = map(point.x, 0, ILI9341_TFTWIDTH, ILI9341_TFTWIDTH, 0);
     int16_t y = map(point.y, 0, ILI9341_TFTHEIGHT, ILI9341_TFTHEIGHT, 0);
-    *event = { type, { x,y } };
+    return Vec2<>{ x,y };
+  };
+
+  auto sendEvent = [&](Event e) {
+    INT8U uCOSerr;
+    // Obtain an Event* from eventHeap
+    auto event = static_cast<Event*>(OSMemGet(eventHeap, &uCOSerr));
+    if (uCOSerr != OS_ERR_NONE) {
+      PrintWithBuf(buf, sizeof(buf), "TouchInputTask: eventHeap failure %d\n", uCOSerr);
+      while (1);
+    }
+
+    // Prepare event
+    *event = e;
 
     // Post event to eventQueue
     uCOSerr = OSQPost(eventQueue, event);
@@ -207,6 +250,7 @@ void TouchInputTask(void* pdata)
 
   unsigned counter = TIMEOUT;   // counter for RELEASE->IDLE transition
   State state = State::IDLE;    // current input state
+  Vec2<> point;
   while (1) {
     // Start with no event
     Event e{ Event::NONE, {} };
@@ -221,16 +265,19 @@ void TouchInputTask(void* pdata)
       default: state = IDLE; break;
     }
 
+    // Update point while touch is ongoing
+    if (touched) { point = getPoint(); }
+
     // If state would change do some extra checks
     if (state != next) {
       // We are leaving IDLE: trigger TOUCH event
-      if (state == IDLE) { sendEvent(Event::TOUCH); }
+      if (state == IDLE) { sendEvent({ Event::TOUCH,point }); }
       // We are entering RELEASE: reset countdown timer
       if (next == RELEASE) { counter = TIMEOUT; }
     } else {
       // While in RELEASE: trigger RELEASE on timeout
       if (state == RELEASE && !counter--) {
-        sendEvent(Event::RELEASE);
+        sendEvent({ Event::RELEASE,point });
         next = IDLE;
       }
     }
