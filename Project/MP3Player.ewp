@@ -2310,6 +2310,9 @@
             <name>$PROJ_DIR$\App\shell.c</name>
         </file>
         <file>
+            <name>$PROJ_DIR$\App\task.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\App\tasks.c</name>
         </file>
     </group>

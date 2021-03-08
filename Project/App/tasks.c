@@ -16,6 +16,7 @@ Module Description:
 #include <stdarg.h>
 #include <vector>
 
+#include "task.h"
 #include "bsp.h"
 #include "print.h"
 #include "mp3Util.h"
@@ -32,6 +33,7 @@ constexpr T map(U x, T imin, T imax, T omin, T omax) {
 
 
 #define BUFSIZE 256
+#define DEFAULT_STK_SIZE 256
 
 /************************************************************************************
 
@@ -39,7 +41,7 @@ constexpr T map(U x, T imin, T imax, T omin, T omax) {
    The maximum number of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
 
 ************************************************************************************/
-#define DEFAULT_STK_SIZE 256
+// Task stacks
 static OS_STK   LcdDisplayTaskStk[DEFAULT_STK_SIZE];
 static OS_STK   TouchInputTaskStk[DEFAULT_STK_SIZE];
 static OS_STK   Mp3StreamTaskStk[DEFAULT_STK_SIZE];
@@ -49,16 +51,7 @@ void LcdDisplayTask(void* pdata);
 void TouchInputTask(void* pdata);
 void Mp3StreamTask(void* pdata);
 
-struct Task {
-  typedef void (*TaskFn)(void*);
-  INT8U priority;
-  TaskFn task;
-  void* arg;
-  OS_STK *stack;
-};
-#define SIZE_ARR(arr) (sizeof(arr)/sizeof(arr[0]))
-#define CREATE_TASK(prio, task, arg, stack) Task{ prio, task, arg, &stack[SIZE_ARR(stack)-1] }
-
+// Task list
 const std::vector<Task> tasks = {
   CREATE_TASK(5, Mp3StreamTask, NULL, Mp3StreamTaskStk),
   CREATE_TASK(6, TouchInputTask, NULL, TouchInputTaskStk),
@@ -75,10 +68,18 @@ struct Song {
   std::string filename;
 };
 
+// global song list
 #define MAX_SONGS 64
 static Song songHeapArray[MAX_SONGS];
 static OS_MEM* songHeap = NULL;
 static std::vector<Song*> songs;
+
+// event queue
+#define MAX_EVENTS 32
+Event eventHeapArray[MAX_EVENTS];
+Event* eventQueueArray[MAX_EVENTS];
+OS_MEM* eventHeap = NULL;
+OS_EVENT* eventQueue = NULL;
 
 // Globals
 BOOLEAN nextSong = OS_FALSE;
@@ -91,48 +92,61 @@ BOOLEAN nextSong = OS_FALSE;
 ************************************************************************************/
 void StartupTask(void* pdata)
 {
-    char buf[BUFSIZE];
+  INT8U uCOSerr;
+  char buf[BUFSIZE];
 
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: Begin\n");
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: Begin\n");
 
-    // Start the system tick
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
-    SetSysTick(OS_TICKS_PER_SEC);
+  // Start the system tick
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
+  SetSysTick(OS_TICKS_PER_SEC);
 
-    // Initialize hardware drivers
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializing Hardware\n");
-    InitializeSD();
-    InitializeLCD(lcdCtrl);
-    InitializeTouch(touchCtrl);
+  // Initialize hardware drivers
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializing Hardware\n");
+  InitializeSD();
+  InitializeLCD(lcdCtrl);
+  InitializeTouch(touchCtrl);
 
-    // initialize songHeap
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializeing Song Heap\n");
-    if (songHeap == NULL) {
-      INT8U uCOSerr;
-      songHeap = OSMemCreate(songHeapArray, MAX_SONGS, sizeof(Song), &uCOSerr);
-      if (uCOSerr != OS_ERR_NONE) while (1);
-    }
+  // initialize songHeap
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializeing Song Heap\n");
+  if (songHeap == NULL) {
+    songHeap = OSMemCreate(songHeapArray, MAX_SONGS, sizeof(Song), &uCOSerr);
+    if (uCOSerr != OS_ERR_NONE) while (1);
+  }
 
-    // List SD card contents
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
-    DebugSDContents();
-    ListMP3Files();
-    PrintWithBuf(buf, sizeof(buf), "Songs:\n");
-    for (auto it = songs.begin(); it != songs.end(); ++it) {
-      PrintWithBuf(buf, sizeof(buf), "  %s\n", (*it)->filename.c_str());
-    }
+  // initialize eventHeap
+  PrintWithBuf(buf, sizeof(buf), "StartupTask: Initializing eventQueue\n");
+  if (eventHeap == NULL) {
+    eventHeap = OSMemCreate(eventHeapArray, MAX_EVENTS, sizeof(Event), &uCOSerr);
+    if (uCOSerr != OS_ERR_NONE) while (1);
+  }
 
-    // Create the test tasks
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
+  // initialize eventQueue
+  if (eventQueue == NULL) {
+    eventQueue = OSQCreate((void**)&eventQueueArray[0], MAX_EVENTS);
+    if (eventQueue == NULL) while (1);
+  }
 
-    // The maximum number of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
-    for (auto it = tasks.begin(); it != tasks.end(); ++it) {
-      OSTaskCreate(it->task, it->arg, it->stack, it->priority);
-    }
+  // List SD card contents
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
+  DebugSDContents();
+  ListMP3Files();
+  PrintWithBuf(buf, sizeof(buf), "Songs:\n");
+  for (auto it = songs.begin(); it != songs.end(); ++it) {
+    PrintWithBuf(buf, sizeof(buf), "  %s\n", (*it)->filename.c_str());
+  }
 
-    // Delete ourselves, letting the work be done in the new tasks.
-    PrintWithBuf(buf, BUFSIZE, "StartupTask: deleting self\n");
-	OSTaskDel(OS_PRIO_SELF);
+  // Create the test tasks
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
+
+  // The maximum number of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
+  for (auto it = tasks.begin(); it != tasks.end(); ++it) {
+    OSTaskCreate(it->task, it->arg, it->stack, it->priority);
+  }
+
+  // Delete ourselves, letting the work be done in the new tasks.
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: deleting self\n");
+      OSTaskDel(OS_PRIO_SELF);
 }
 
 /************************************************************************************
@@ -142,17 +156,27 @@ void StartupTask(void* pdata)
 ************************************************************************************/
 void LcdDisplayTask(void* pdata)
 {
-    char buf[BUFSIZE];
-    PrintWithBuf(buf, BUFSIZE, "LcdDisplayTask: starting\n");
+  INT8U uCOSerr;
+  char buf[BUFSIZE];
+  PrintWithBuf(buf, BUFSIZE, "LcdDisplayTask: starting\n");
 
-    DrawLcdContents();
-    while (1) {
-      OSTimeDly(1000);
-    }
+  DrawLcdContents();
+  while (1) {
+    // handle all events in eventQueue
+    do {
+      Event* msg = (Event*)OSQPend(eventQueue, 1, &uCOSerr);
+      if (uCOSerr != OS_ERR_NONE) break;
+      PrintWithBuf(buf, sizeof(buf), "Received: %d (%d,%d)\n", msg->type, msg->position.x, msg->position.y);
+      // TODO: do something with event
+    } while (uCOSerr == OS_ERR_NONE);
+
+    OSTimeDly(1000);
+  }
 }
 
 void TouchInputTask(void* pdata)
 {
+  const unsigned TIMEOUT = 4;
   char buf[BUFSIZE];
   PrintWithBuf(buf, BUFSIZE, "TouchInputTask: starting\n");
 
@@ -162,20 +186,34 @@ void TouchInputTask(void* pdata)
     RELEASE
   };
 
-  auto getPoint = []() {
+  auto sendEvent = [&](Event::Type type) {
+    INT8U uCOSerr;
+    // Obtain an Event* from eventHeap
+    auto event = static_cast<Event*>(OSMemGet(eventHeap, &uCOSerr));
+    if (uCOSerr != OS_ERR_NONE) return;
+
+    // Prepare event
     auto point = touchCtrl.getPoint();
-    point.x = map(point.x, 0, ILI9341_TFTWIDTH, ILI9341_TFTWIDTH, 0);
-    point.y = map(point.y, 0, ILI9341_TFTHEIGHT, ILI9341_TFTHEIGHT, 0);
-    return Vec2<>{ point.x, point.y };
+    int16_t x = map(point.x, 0, ILI9341_TFTWIDTH, ILI9341_TFTWIDTH, 0);
+    int16_t y = map(point.y, 0, ILI9341_TFTHEIGHT, ILI9341_TFTHEIGHT, 0);
+    *event = { type, { x,y } };
+
+    // Post event to eventQueue
+    uCOSerr = OSQPost(eventQueue, event);
+    if (uCOSerr == OS_ERR_Q_FULL) {
+      PrintWithBuf(buf, sizeof(buf), "TouchInputTask: Queue is full!\n");
+    }
   };
 
-  const unsigned TIMEOUT = 4;
-  unsigned counter = TIMEOUT;
-
-  State state = State::IDLE;
+  unsigned counter = TIMEOUT;   // counter for RELEASE->IDLE transition
+  State state = State::IDLE;    // current input state
   while (1) {
-    State next = state;
+    // Start with no event
+    Event e{ Event::NONE, {} };
+
+    // Determine next state from state of ILI9341
     bool touched = touchCtrl.touched();
+    State next = state;
     switch (state) {
       case IDLE:    next = touched ? TOUCH : state; break;
       case TOUCH:   next = touched ? state : RELEASE; break;
@@ -183,20 +221,18 @@ void TouchInputTask(void* pdata)
       default: state = IDLE; break;
     }
 
-    Event e{ Event::NONE, {} };
+    // If state would change do some extra checks
     if (state != next) {
-      if (state == IDLE) { e = { Event::TOUCH, getPoint() }; }
+      // We are leaving IDLE: trigger TOUCH event
+      if (state == IDLE) { sendEvent(Event::TOUCH); }
+      // We are entering RELEASE: reset countdown timer
       if (next == RELEASE) { counter = TIMEOUT; }
     } else {
+      // While in RELEASE: trigger RELEASE on timeout
       if (state == RELEASE && !counter--) {
-        e = { Event::RELEASE, getPoint() };
+        sendEvent(Event::RELEASE);
         next = IDLE;
       }
-    }
-
-    if (e.type != Event::NONE) {
-      PrintWithBuf(buf, sizeof(buf), "TouchInputTask: %d (%d,%d)\n", e.type, e.position.x, e.position.y);
-      // TODO insert into event queue
     }
 
     state = next;
