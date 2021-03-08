@@ -21,11 +21,13 @@ Module Description:
 #include "mp3Util.h"
 #include "drivers.h"
 
+#include "event.h"
+
 #define PENRADIUS 3
 
-long MapTouchToScreen(long x, long in_min, long in_max, long out_min, long out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+template <typename T, typename U>
+constexpr T map(U x, T imin, T imax, T omin, T omax) {
+  return (x - imin) * (omax - omin) / (imax - imin) + omin;
 }
 
 
@@ -37,13 +39,31 @@ long MapTouchToScreen(long x, long in_min, long in_max, long out_min, long out_m
    The maximum number of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
 
 ************************************************************************************/
-
-static OS_STK   LcdTouchDemoTaskStk[APP_CFG_TASK_START_STK_SIZE];
-static OS_STK   Mp3DemoTaskStk[APP_CFG_TASK_START_STK_SIZE];
+#define DEFAULT_STK_SIZE 256
+static OS_STK   LcdDisplayTaskStk[DEFAULT_STK_SIZE];
+static OS_STK   TouchInputTaskStk[DEFAULT_STK_SIZE];
+static OS_STK   Mp3StreamTaskStk[DEFAULT_STK_SIZE];
 
 // Task prototypes
-void LcdTouchDemoTask(void* pdata);
-void Mp3DemoTask(void* pdata);
+void LcdDisplayTask(void* pdata);
+void TouchInputTask(void* pdata);
+void Mp3StreamTask(void* pdata);
+
+struct Task {
+  typedef void (*TaskFn)(void*);
+  INT8U priority;
+  TaskFn task;
+  void* arg;
+  OS_STK *stack;
+};
+#define SIZE_ARR(arr) (sizeof(arr)/sizeof(arr[0]))
+#define CREATE_TASK(prio, task, arg, stack) Task{ prio, task, arg, &stack[SIZE_ARR(stack)-1] }
+
+const std::vector<Task> tasks = {
+  CREATE_TASK(5, Mp3StreamTask, NULL, Mp3StreamTaskStk),
+  CREATE_TASK(6, TouchInputTask, NULL, TouchInputTaskStk),
+  CREATE_TASK(7, LcdDisplayTask, NULL, LcdDisplayTaskStk),
+};
 
 // Useful functions
 void PrintToLcdWithBuf(char *buf, int size, char *format, ...);
@@ -106,8 +126,9 @@ void StartupTask(void* pdata)
     PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
 
     // The maximum number of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
-    OSTaskCreate(Mp3DemoTask, (void*)0, &Mp3DemoTaskStk[APP_CFG_TASK_START_STK_SIZE-1], APP_TASK_TEST1_PRIO);
-    OSTaskCreate(LcdTouchDemoTask, (void*)0, &LcdTouchDemoTaskStk[APP_CFG_TASK_START_STK_SIZE-1], APP_TASK_TEST2_PRIO);
+    for (auto it = tasks.begin(); it != tasks.end(); ++it) {
+      OSTaskCreate(it->task, it->arg, it->stack, it->priority);
+    }
 
     // Delete ourselves, letting the work be done in the new tasks.
     PrintWithBuf(buf, BUFSIZE, "StartupTask: deleting self\n");
@@ -119,49 +140,79 @@ void StartupTask(void* pdata)
    Runs LCD/Touch demo code
 
 ************************************************************************************/
-void LcdTouchDemoTask(void* pdata)
+void LcdDisplayTask(void* pdata)
 {
     char buf[BUFSIZE];
-    PrintWithBuf(buf, BUFSIZE, "LcdTouchDemoTask: starting\n");
+    PrintWithBuf(buf, BUFSIZE, "LcdDisplayTask: starting\n");
 
     DrawLcdContents();
-
-    int currentcolor = ILI9341_RED;
     while (1) {
-        boolean touched;
-
-        touched = touchCtrl.touched();
-
-        if (! touched) {
-            OSTimeDly(5);
-            continue;
-        }
-
-        TS_Point point;
-
-        point = touchCtrl.getPoint();
-        if (point.x == 0 && point.y == 0)
-        {
-            continue; // usually spurious, so ignore
-        }
-
-        // transform touch orientation to screen orientation.
-        TS_Point p = TS_Point();
-        p.x = MapTouchToScreen(point.x, 0, ILI9341_TFTWIDTH, ILI9341_TFTWIDTH, 0);
-        p.y = MapTouchToScreen(point.y, 0, ILI9341_TFTHEIGHT, ILI9341_TFTHEIGHT, 0);
-
-        lcdCtrl.fillCircle(p.x, p.y, PENRADIUS, currentcolor);
+      OSTimeDly(1000);
     }
 }
+
+void TouchInputTask(void* pdata)
+{
+  char buf[BUFSIZE];
+  PrintWithBuf(buf, BUFSIZE, "TouchInputTask: starting\n");
+
+  enum State {
+    IDLE,
+    TOUCH,
+    RELEASE
+  };
+
+  auto getPoint = []() {
+    auto point = touchCtrl.getPoint();
+    point.x = map(point.x, 0, ILI9341_TFTWIDTH, ILI9341_TFTWIDTH, 0);
+    point.y = map(point.y, 0, ILI9341_TFTHEIGHT, ILI9341_TFTHEIGHT, 0);
+    return Vec2<>{ point.x, point.y };
+  };
+
+  const unsigned TIMEOUT = 4;
+  unsigned counter = TIMEOUT;
+
+  State state = State::IDLE;
+  while (1) {
+    State next = state;
+    bool touched = touchCtrl.touched();
+    switch (state) {
+      case IDLE:    next = touched ? TOUCH : state; break;
+      case TOUCH:   next = touched ? state : RELEASE; break;
+      case RELEASE: next = touched ? TOUCH : state; break;
+      default: state = IDLE; break;
+    }
+
+    Event e{ Event::NONE, {} };
+    if (state != next) {
+      if (state == IDLE) { e = { Event::TOUCH, getPoint() }; }
+      if (next == RELEASE) { counter = TIMEOUT; }
+    } else {
+      if (state == RELEASE && !counter--) {
+        e = { Event::RELEASE, getPoint() };
+        next = IDLE;
+      }
+    }
+
+    if (e.type != Event::NONE) {
+      PrintWithBuf(buf, sizeof(buf), "TouchInputTask: %d (%d,%d)\n", e.type, e.position.x, e.position.y);
+      // TODO insert into event queue
+    }
+
+    state = next;
+    OSTimeDly(10);
+  }
+}
+
 /************************************************************************************
 
    Runs MP3 demo code
 
 ************************************************************************************/
-void Mp3DemoTask(void* pdata)
+void Mp3StreamTask(void* pdata)
 {
     char buf[BUFSIZE];
-    PrintWithBuf(buf, BUFSIZE, "Mp3DemoTask: starting\n");
+    PrintWithBuf(buf, BUFSIZE, "Mp3StreamTask: starting\n");
 
     HANDLE hMp3;
     InitializeMP3(hMp3);
