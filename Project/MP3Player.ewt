@@ -2442,6 +2442,12 @@
             </file>
         </group>
         <file>
+            <name>$PROJ_DIR$\App\drivers.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\App\drivers.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\App\main.c</name>
         </file>
         <file>

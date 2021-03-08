@@ -51,7 +51,6 @@ INT8U err;
         __DATE__,
         __TIME__));
 
-
     // Initialize the OS
     DEBUGMSG(1, ("main: Running OSInit()...\n"));
     OSInit();

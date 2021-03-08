@@ -14,18 +14,12 @@ Module Description:
 
 ************************************************************************************/
 #include <stdarg.h>
+#include <vector>
 
 #include "bsp.h"
 #include "print.h"
 #include "mp3Util.h"
-
-#include <Adafruit_GFX.h>    // Core graphics library
-#include <Adafruit_ILI9341.h>
-#include <Adafruit_FT6206.h>
-
-Adafruit_ILI9341 lcdCtrl = Adafruit_ILI9341(); // The LCD controller
-
-Adafruit_FT6206 touchCtrl = Adafruit_FT6206(); // The touch controller
+#include "drivers.h"
 
 #define PENRADIUS 3
 
@@ -34,8 +28,6 @@ long MapTouchToScreen(long x, long in_min, long in_max, long out_min, long out_m
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-
-#include "train_crossing.h"
 
 #define BUFSIZE 256
 
@@ -54,10 +46,19 @@ static OS_STK   Mp3DemoTaskStk[APP_CFG_TASK_START_STK_SIZE];
 void LcdTouchDemoTask(void* pdata);
 void Mp3DemoTask(void* pdata);
 
-
-
 // Useful functions
 void PrintToLcdWithBuf(char *buf, int size, char *format, ...);
+void DebugSDContents();
+void ListMP3Files();
+
+struct Song {
+  std::string filename;
+};
+
+#define MAX_SONGS 64
+static Song songHeapArray[MAX_SONGS];
+static OS_MEM* songHeap = NULL;
+static std::vector<Song*> songs;
 
 // Globals
 BOOLEAN nextSong = OS_FALSE;
@@ -70,35 +71,35 @@ BOOLEAN nextSong = OS_FALSE;
 ************************************************************************************/
 void StartupTask(void* pdata)
 {
-	char buf[BUFSIZE];
+    char buf[BUFSIZE];
 
-    PjdfErrCode pjdfErr;
-    INT32U length;
-    static HANDLE hSD = 0;
-    static HANDLE hSPI = 0;
-
-	PrintWithBuf(buf, BUFSIZE, "StartupTask: Begin\n");
-	PrintWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
+    PrintWithBuf(buf, BUFSIZE, "StartupTask: Begin\n");
 
     // Start the system tick
+    PrintWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
     SetSysTick(OS_TICKS_PER_SEC);
 
-    // Initialize SD card
-    PrintWithBuf(buf, PRINTBUFMAX, "Opening handle to SD driver: %s\n", PJDF_DEVICE_ID_SD_ADAFRUIT);
-    hSD = Open(PJDF_DEVICE_ID_SD_ADAFRUIT, 0);
-    if (!PJDF_IS_VALID_HANDLE(hSD)) while(1);
+    PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializing Hardware\n");
+    InitializeSD();
+    InitializeLCD(lcdCtrl);
+    InitializeTouch(touchCtrl);
 
+    PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
+    DebugSDContents();
 
-    PrintWithBuf(buf, PRINTBUFMAX, "Opening SD SPI driver: %s\n", SD_SPI_DEVICE_ID);
-    // We talk to the SD controller over a SPI interface therefore
-    // open an instance of that SPI driver and pass the handle to
-    // the SD driver.
-    hSPI = Open(SD_SPI_DEVICE_ID, 0);
-    if (!PJDF_IS_VALID_HANDLE(hSPI)) while(1);
+    // initialize songHeap
+    PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializeing Song Heap\n");
+    if (songHeap == NULL) {
+      INT8U uCOSerr;
+      songHeap = OSMemCreate(songHeapArray, MAX_SONGS, sizeof(Song), &uCOSerr);
+      if (uCOSerr != OS_ERR_NONE) while (1);
+    }
 
-    length = sizeof(HANDLE);
-    pjdfErr = Ioctl(hSD, PJDF_CTRL_SD_SET_SPI_HANDLE, &hSPI, &length);
-    if(PJDF_IS_ERROR(pjdfErr)) while(1);
+    ListMP3Files();
+    PrintWithBuf(buf, sizeof(buf), "Songs:\n");
+    for (auto it = songs.begin(); it != songs.end(); ++it) {
+      PrintWithBuf(buf, sizeof(buf), "  %s\n", (*it)->filename.c_str());
+    }
 
     // Create the test tasks
     PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
@@ -139,56 +140,12 @@ static void DrawLcdContents()
 ************************************************************************************/
 void LcdTouchDemoTask(void* pdata)
 {
-    PjdfErrCode pjdfErr;
-    INT32U length;
-    uint8_t addr = FT6206_ADDR;
-
     char buf[BUFSIZE];
     PrintWithBuf(buf, BUFSIZE, "LcdTouchDemoTask: starting\n");
 
-    PrintWithBuf(buf, BUFSIZE, "Opening LCD driver: %s\n", PJDF_DEVICE_ID_LCD_ILI9341);
-    // Open handle to the LCD driver
-    HANDLE hLcd = Open(PJDF_DEVICE_ID_LCD_ILI9341, 0);
-    if (!PJDF_IS_VALID_HANDLE(hLcd)) while(1);
-
-	PrintWithBuf(buf, BUFSIZE, "Opening LCD SPI driver: %s\n", LCD_SPI_DEVICE_ID);
-    // We talk to the LCD controller over a SPI interface therefore
-    // open an instance of that SPI driver and pass the handle to
-    // the LCD driver.
-    HANDLE hSPI = Open(LCD_SPI_DEVICE_ID, 0);
-    if (!PJDF_IS_VALID_HANDLE(hSPI)) while(1);
-
-    length = sizeof(HANDLE);
-    pjdfErr = Ioctl(hLcd, PJDF_CTRL_LCD_SET_SPI_HANDLE, &hSPI, &length);
-    if(PJDF_IS_ERROR(pjdfErr)) while(1);
-
-    PrintWithBuf(buf, BUFSIZE, "Initializing LCD controller\n");
-    lcdCtrl.setPjdfHandle(hLcd);
-    lcdCtrl.begin();
-
     DrawLcdContents();
 
-    // Open a HANDLE for accessing device PJDF_DEVICE_ID_I2C1
-    PrintWithBuf(buf, BUFSIZE, "Opening FT6206 I2C driver: %s\n", LCD_I2C_DEVICE_ID);
-    HANDLE hI2C = Open(LCD_I2C_DEVICE_ID, 0);
-    if (!PJDF_IS_VALID_HANDLE(hI2C)) while(1);
-
-    // Call Ioctl on that handle to set the I2C device address to FT6206_ADDR
-    length = sizeof(addr);
-    pjdfErr = Ioctl(hI2C, PJDF_CTRL_I2C_SET_DEVICE_ADDRESS, &addr, &length);
-    if  (PJDF_IS_ERROR(pjdfErr)) while(1);
-
-    // Call setPjdfHandle() on the touch contoller to pass in the I2C handle
-    PrintWithBuf(buf, BUFSIZE, "Initializing FT6206 touchscreen controller\n");
-    touchCtrl.setPjdfHandle(hI2C);
-
-    if (! touchCtrl.begin(40)) {  // pass in 'sensitivity' coefficient
-        PrintWithBuf(buf, BUFSIZE, "Couldn't start FT6206 touchscreen controller\n");
-        while (1);
-    }
-
     int currentcolor = ILI9341_RED;
-
     while (1) {
         boolean touched;
 
@@ -222,39 +179,22 @@ void LcdTouchDemoTask(void* pdata)
 ************************************************************************************/
 void Mp3DemoTask(void* pdata)
 {
-    PjdfErrCode pjdfErr;
-    INT32U length;
-
     char buf[BUFSIZE];
     PrintWithBuf(buf, BUFSIZE, "Mp3DemoTask: starting\n");
 
-    PrintWithBuf(buf, BUFSIZE, "Opening MP3 driver: %s\n", PJDF_DEVICE_ID_MP3_VS1053);
-    // Open handle to the MP3 decoder driver
-    HANDLE hMp3 = Open(PJDF_DEVICE_ID_MP3_VS1053, 0);
-    if (!PJDF_IS_VALID_HANDLE(hMp3)) while(1);
+    HANDLE hMp3;
+    InitializeMP3(hMp3);
 
-	PrintWithBuf(buf, BUFSIZE, "Opening MP3 SPI driver: %s\n", MP3_SPI_DEVICE_ID);
-    // We talk to the MP3 decoder over a SPI interface therefore
-    // open an instance of that SPI driver and pass the handle to
-    // the MP3 driver.
-    HANDLE hSPI = Open(MP3_SPI_DEVICE_ID, 0);
-    if (!PJDF_IS_VALID_HANDLE(hSPI)) while(1);
-
-    length = sizeof(HANDLE);
-    pjdfErr = Ioctl(hMp3, PJDF_CTRL_MP3_SET_SPI_HANDLE, &hSPI, &length);
-    if(PJDF_IS_ERROR(pjdfErr)) while(1);
-
-    // Send initialization data to the MP3 decoder and run a test
-	PrintWithBuf(buf, BUFSIZE, "Starting MP3 device test\n");
-    Mp3Init(hMp3);
     int count = 0;
 
     while (1)
     {
         OSTimeDly(500);
+#if 0
         PrintWithBuf(buf, BUFSIZE, "Begin streaming sound file  count=%d\n", ++count);
         Mp3Stream(hMp3, (INT8U*)Train_Crossing, sizeof(Train_Crossing));
         PrintWithBuf(buf, BUFSIZE, "Done streaming sound file  count=%d\n", count);
+#endif
     }
 }
 
@@ -279,6 +219,51 @@ void PrintToLcdWithBuf(char *buf, int size, char *format, ...)
     va_end(args);
 }
 
+void DebugSDContentsHelper(File dir, int level = 0) {
+  char buf[24]; // holds 8.3 name
+  if (!dir) return;
+  PrintWithBuf(buf, sizeof(buf), "%*s%s\n", 2*level, "", dir.name());
+  level += 1;
+  while (1) {
+    File entry = dir.openNextFile();
+    if (!entry) { break; }
+    if (entry.isDirectory()) { DebugSDContentsHelper(entry, level); continue; }
+    PrintWithBuf(buf, sizeof(buf), "%*s%s\n", 2*level, "", entry.name());
+    entry.close();
+  }
+}
 
+void DebugSDContents() {
+  File dir = SD.open("/");
+  DebugSDContentsHelper(dir);
+}
+
+void ListMP3FilesHelper(File dir) {
+  char buf[24];
+  if (!dir) { return; }
+  while (1) {
+    File entry = dir.openNextFile();
+    if (!entry) { break; }
+    if (entry.isDirectory()) { ListMP3FilesHelper(entry); }
+    else {
+      if (!strstr(entry.name(), ".MP3")) { continue; }
+      // allocate space for song
+      INT8U uCOSerr;
+      auto song = static_cast<Song*>(OSMemGet(songHeap, &uCOSerr));
+      if (uCOSerr != OS_ERR_NONE) while (1);
+      // populate song fields
+      song->filename = std::string{ entry.name() };
+      songs.push_back(song);
+      PrintWithBuf(buf, sizeof(buf), "%s\n", entry.name());
+    }
+    entry.close();
+  }
+}
+
+void ListMP3Files() {
+  File dir = SD.open("/");
+  ListMP3FilesHelper(dir);
+  dir.close();
+}
 
 
