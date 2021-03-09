@@ -2455,6 +2455,9 @@
                     <name>$PROJ_DIR$\App\libui\include\event.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\App\libui\include\marquee.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\App\libui\include\node.h</name>
                 </file>
                 <file>
@@ -2500,6 +2503,9 @@
                     <name>$PROJ_DIR$\App\libui\src\duration.cpp</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\App\libui\src\marquee.cpp</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\App\libui\src\node.cpp</name>
                 </file>
                 <file>
@@ -2518,6 +2524,15 @@
                     <name>$PROJ_DIR$\App\libui\src\texturebutton.cpp</name>
                 </file>
             </group>
+        </group>
+        <group>
+            <name>mp3</name>
+            <file>
+                <name>$PROJ_DIR$\App\libui\mp3\mp3.cpp</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\App\libui\mp3\mp3.h</name>
+            </file>
         </group>
         <group>
             <name>uCOS</name>

@@ -13,7 +13,10 @@ Module Description:
 2016/2 Nick Strathy adapted it for NUCLEO-F401RE
 
 ************************************************************************************/
-#include <stdarg.h>
+#include <cstdarg>
+#include <cctype>
+#include <cassert>
+#include <algorithm>
 #include <vector>
 
 #include "task.h"
@@ -23,7 +26,7 @@ Module Description:
 #include "drivers.h"
 
 #include "event.h"
-#include "button.h"
+#include "mp3.h"
 
 #define PENRADIUS 3
 
@@ -84,6 +87,7 @@ OS_EVENT* eventQueue = NULL;
 
 // Globals
 BOOLEAN nextSong = OS_FALSE;
+Bitmap play_texture, prev_texture, next_texture, pause_texture;
 
 /************************************************************************************
 
@@ -136,6 +140,13 @@ void StartupTask(void* pdata)
     PrintWithBuf(buf, sizeof(buf), "  %s\n", (*it)->filename.c_str());
   }
 
+  // load bitmap images
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: Loading bitmap icons\n");
+  play_texture = loadBitmap("play.pgm");
+  pause_texture = loadBitmap("pause.pgm");
+  prev_texture = loadBitmap("prev.pgm");
+  next_texture = loadBitmap("next.pgm");
+
   // Create the test tasks
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
 
@@ -156,36 +167,23 @@ void StartupTask(void* pdata)
    Runs LCD/Touch demo code
 
 ************************************************************************************/
-Button* bd;
-void onClick() {
-  static char t[32];
-  static unsigned i = 0;
-  snprintf(t, sizeof(t), "Clicked %d times!\n", i++);
-  bd->text.setText(t);
-}
 void LcdDisplayTask(void* pdata)
 {
   INT8U uCOSerr;
   char buf[BUFSIZE];
   PrintWithBuf(buf, BUFSIZE, "LcdDisplayTask: starting\n");
 
-  Button b;
-  bd = &b;
-  b.text.setText("Clicked 0 times!\n");
-  b.text.setTextSize(2);
-  b.setBackground({ 0xEF, 0x00, 0xEF });
-  auto s = b.text.getSize();
-  b.setSize({
-    static_cast<int16_t>(s.x+32),
-    static_cast<int16_t>(s.y+32)
-  });
-  b.text.setPosition({ 16,16 });
-  b.setOnClick(&onClick);
-
+  MP3 b(lcdCtrl.width(), lcdCtrl.height());
+  b.title.setText("Kling To The Wreckage");
+  b.artist.setText(" ");
+  b.refreshLayout();
+  b.title.setSmooth(false);
+  b.artist.setSmooth(false);
   b.setGFX(&lcdCtrl);
-  PrintWithBuf(buf, sizeof(buf), "(%d,%d)\n", b.getSize().x, b.getSize().y);
+  lcdCtrl.fillScreen(0);
 
-  DrawLcdContents();
+  INT32U time = OSTimeGet();
+
   while (1) {
     // handle all events in eventQueue
     do {
@@ -196,6 +194,10 @@ void LcdDisplayTask(void* pdata)
       // TODO: do something with event
       PrintWithBuf(buf, sizeof(buf), "Received: %d (%d,%d)\n", msg->type, msg->position.x, msg->position.y);
       b.input(*msg);
+      if (msg->type == Event::RELEASE) {
+        b.title.setSmooth(!b.title.getSmooth());
+        b.artist.setText(b.title.getSmooth() ? "smooth" : "!smooth");
+      }
 
       // Free allocated memory
       uCOSerr = OSMemPut(eventHeap, msg);
@@ -205,9 +207,10 @@ void LcdDisplayTask(void* pdata)
       }
     } while (uCOSerr == OS_ERR_NONE);
 
-    b.process();
-
-    OSTimeDly(1);
+    INT32U next = OSTimeGet();
+    b.process(next - time);
+    time = next;
+    OSTimeDly(20);
   }
 }
 
@@ -399,4 +402,67 @@ void ListMP3Files() {
   dir.close();
 }
 
+Bitmap loadBitmap(const char* filename) {
+  Bitmap out;
+  int ret;
+
+  auto file = SD.open(filename);
+
+  // look for Netpbm PGM magic
+  uint16_t magic;
+  ret = file.read(&magic, sizeof(magic));
+  magic = ntoh(magic);
+  if (magic != 20533) return out;
+
+  auto extractDecimalNumber = [&](uint32_t* number) {
+    int c;
+
+    // ignore whitespace
+    for (c = file.peek(); isspace(c); c = file.read());
+
+    // count digits
+    uint32_t start, end;
+    start = file.position();
+    for (c = file.peek(); isdigit(c); c = file.read());
+    end = file.position();
+
+    // convert ascii to uint32_t
+    char data[11]; // enough for 32-bit decimal (plus \0)
+    memset(data, 0, sizeof(data));
+    file.seek(start-1);
+    ret = file.read(data, std::min(end-start, sizeof(data)-1));
+    // TODO ret
+    *number = atoi(data);
+  };
+
+  // extract header values
+  uint32_t width, height, maxval;
+  extractDecimalNumber(&width);
+  extractDecimalNumber(&height);
+  extractDecimalNumber(&maxval);
+
+  // I don't support 16-bit PGM due to laziness
+  assert(maxval < 256);
+
+  // single whitespace between header and the promised data
+  assert(isspace(file.read()));
+
+#if 1
+  char buf[80];
+  PrintWithBuf(buf, sizeof(buf), "%s\n  width: %d\n  height: %d\n  maxval: %d\n",
+               filename, width, height, maxval);
+#endif
+
+  auto data = new uint8_t[width*height];
+  int i = 0;
+  for (int h = 0; h < height; ++h) {
+    for (int w = 0; w < width; ++w) {
+      data[i++] = file.read();
+    }
+  }
+
+  out.setBitmap(data, { width,height }); // WARNING data is lost to the ether!
+  file.close();
+  return out;
+}
 
