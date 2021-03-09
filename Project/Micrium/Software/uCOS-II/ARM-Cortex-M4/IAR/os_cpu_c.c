@@ -551,7 +551,7 @@ void OS_CPU_SysTickInit(INT32U ticksPerSec)
     LL_RCC_ClocksTypeDef RCC_ClocksStatus;
 
     LL_RCC_GetSystemClocksFreq(&RCC_ClocksStatus);
-    
-    SysTick_Config(RCC_ClocksStatus.HCLK_Frequency / OS_TICKS_PER_SEC);
+
+    SysTick_Config(RCC_ClocksStatus.HCLK_Frequency / ticksPerSec);
 }
 
