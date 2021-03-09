@@ -142,10 +142,10 @@ void StartupTask(void* pdata)
 
   // load bitmap images
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Loading bitmap icons\n");
-  play_texture = loadBitmap("play.pgm");
-  pause_texture = loadBitmap("pause.pgm");
-  prev_texture = loadBitmap("prev.pgm");
-  next_texture = loadBitmap("next.pgm");
+  play_texture = loadBitmap("icon/play.pgm");
+  pause_texture = loadBitmap("icon/pause.pgm");
+  prev_texture = loadBitmap("icon/prev.pgm");
+  next_texture = loadBitmap("icon/next.pgm");
 
   // Create the test tasks
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
@@ -175,10 +175,8 @@ void LcdDisplayTask(void* pdata)
 
   MP3 b(lcdCtrl.width(), lcdCtrl.height());
   b.title.setText("Kling To The Wreckage");
-  b.artist.setText(" ");
+  b.artist.setText("The Crystal Method");
   b.refreshLayout();
-  b.title.setSmooth(false);
-  b.artist.setSmooth(false);
   b.setGFX(&lcdCtrl);
   lcdCtrl.fillScreen(0);
 
@@ -191,13 +189,8 @@ void LcdDisplayTask(void* pdata)
       Event* msg = (Event*)OSQPend(eventQueue, 1, &uCOSerr);
       if (uCOSerr != OS_ERR_NONE) break;
 
-      // TODO: do something with event
-      PrintWithBuf(buf, sizeof(buf), "Received: %d (%d,%d)\n", msg->type, msg->position.x, msg->position.y);
+      // Do something with the event
       b.input(*msg);
-      if (msg->type == Event::RELEASE) {
-        b.title.setSmooth(!b.title.getSmooth());
-        b.artist.setText(b.title.getSmooth() ? "smooth" : "!smooth");
-      }
 
       // Free allocated memory
       uCOSerr = OSMemPut(eventHeap, msg);
@@ -402,7 +395,15 @@ void ListMP3Files() {
   dir.close();
 }
 
+uint8_t bitmapHeapArr[64*64*4];
+OS_MEM* bitmapHeap = NULL;
+
 Bitmap loadBitmap(const char* filename) {
+  INT8U uCOSerr;
+  if (bitmapHeap == NULL) {
+    bitmapHeap = OSMemCreate(bitmapHeapArr, 4, 64*64, &uCOSerr);
+    if (uCOSerr != OS_ERR_NONE) while (1);
+  }
   Bitmap out;
   int ret;
 
@@ -453,7 +454,8 @@ Bitmap loadBitmap(const char* filename) {
                filename, width, height, maxval);
 #endif
 
-  auto data = new uint8_t[width*height];
+  auto data = (uint8_t*)OSMemGet(bitmapHeap, &uCOSerr);
+  if (uCOSerr != OS_ERR_NONE) while (1);
   int i = 0;
   for (int h = 0; h < height; ++h) {
     for (int w = 0; w < width; ++w) {
