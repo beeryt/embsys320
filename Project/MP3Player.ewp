@@ -227,6 +227,7 @@
                     <state>USE_FULL_LL_DRIVER</state>
                     <state>STM32L475xx</state>
                     <state>DEBUG</state>
+                    <state>IAR_COMPILER</state>
                 </option>
                 <option>
                     <name>CCPreprocFile</name>
@@ -2225,10 +2226,10 @@
                     <name>$PROJ_DIR$\App\libui\include\playback.h</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\App\libui\include\rect.h</name>
+                    <name>$PROJ_DIR$\App\libui\include\progressbar.h</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\App\libui\include\slider.h</name>
+                    <name>$PROJ_DIR$\App\libui\include\rect.h</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\App\libui\include\sprite.h</name>
@@ -2273,7 +2274,7 @@
                     <name>$PROJ_DIR$\App\libui\src\playback.cpp</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\App\libui\src\slider.cpp</name>
+                    <name>$PROJ_DIR$\App\libui\src\progressbar.cpp</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\App\libui\src\sprite.cpp</name>
