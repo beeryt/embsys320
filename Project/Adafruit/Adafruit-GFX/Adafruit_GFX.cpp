@@ -34,6 +34,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "Adafruit_GFX.h"
 #include "glcdfont.c"
 
+#define swap(a, b) { int16_t t = a; a = b; b = t; }
+
 void PrintToLcdWithBuf(char *buf, int size, char *format, ...);
 #define BUTTONBUFSIZE 16
 char buttonBuf[BUTTONBUFSIZE];
