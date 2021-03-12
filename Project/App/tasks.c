@@ -68,10 +68,6 @@ void DebugSDContents();
 void ListMP3Files();
 void DrawLcdContents();
 
-struct Song {
-  std::string filename;
-};
-
 // global song list
 #define MAX_SONGS 64
 static Song songHeapArray[MAX_SONGS];
