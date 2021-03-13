@@ -2933,5 +2933,8 @@
         <file>
             <name>$PROJ_DIR$\Util\printf.h</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\Util\util.h</name>
+        </file>
     </group>
 </project>

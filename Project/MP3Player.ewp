@@ -2295,6 +2295,15 @@
             <file>
                 <name>$PROJ_DIR$\App\libui\mp3\mp3.h</name>
             </file>
+            <file>
+                <name>$PROJ_DIR$\App\libui\mp3\song.cpp</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\App\libui\mp3\song.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\App\libui\mp3\util.h</name>
+            </file>
         </group>
         <group>
             <name>uCOS</name>
@@ -2701,6 +2710,9 @@
         </file>
         <file>
             <name>$PROJ_DIR$\Util\printf.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\Util\util.h</name>
         </file>
     </group>
 </project>

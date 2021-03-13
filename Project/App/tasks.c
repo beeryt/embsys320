@@ -24,6 +24,7 @@ Module Description:
 #include "print.h"
 #include "mp3Util.h"
 #include "drivers.h"
+#include "util.h"
 
 #include "event.h"
 #include "mp3.h"
@@ -75,11 +76,11 @@ static OS_MEM* songHeap = NULL;
 static std::vector<Song*> songs;
 
 // event queue
-#define MAX_EVENTS 32
-Event eventHeapArray[MAX_EVENTS];
-Event* eventQueueArray[MAX_EVENTS];
-OS_MEM* eventHeap = NULL;
-OS_EVENT* eventQueue = NULL;
+Queue<Event, 32> eventQueue;
+
+// command queue
+enum class Command { PREVIOUS, PLAYPAUSE, NEXT };
+Queue<Command, 4> commandQueue;
 
 // Globals
 BOOLEAN nextSong = OS_FALSE;
@@ -115,18 +116,8 @@ void StartupTask(void* pdata)
     if (uCOSerr != OS_ERR_NONE) while (1);
   }
 
-  // initialize eventHeap
-  PrintWithBuf(buf, sizeof(buf), "StartupTask: Initializing eventQueue\n");
-  if (eventHeap == NULL) {
-    eventHeap = OSMemCreate(eventHeapArray, MAX_EVENTS, sizeof(Event), &uCOSerr);
-    if (uCOSerr != OS_ERR_NONE) while (1);
-  }
-
-  // initialize eventQueue
-  if (eventQueue == NULL) {
-    eventQueue = OSQCreate((void**)&eventQueueArray[0], MAX_EVENTS);
-    if (eventQueue == NULL) while (1);
-  }
+  eventQueue.initialize();
+  commandQueue.initialize();
 
   // List SD card contents
   PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
@@ -182,22 +173,16 @@ void LcdDisplayTask(void* pdata)
     // handle all events in eventQueue
     do {
       // Pop msg from eventQueue
-      Event* msg = (Event*)OSQPend(eventQueue, 1, &uCOSerr);
-      if (uCOSerr != OS_ERR_NONE) break;
+      Event e;
+      auto err = eventQueue.pop(&e);
+      if (err != OS_ERR_NONE) continue;
 
       // Do something with the event
-      b.input(*msg);
-
-      // Free allocated memory
-      uCOSerr = OSMemPut(eventHeap, msg);
-      if (uCOSerr != OS_ERR_NONE) {
-        PrintWithBuf(buf, sizeof(buf), "LcdDisplayTask: eventHeap failure %d\n", uCOSerr);
-        while (1);
-      }
+      //b.input(*msg);
     } while (uCOSerr == OS_ERR_NONE);
 
     INT32U next = OSTimeGet();
-    b.process(next - time);
+    //b.process(next - time);
     time = next;
     OSTimeDly(20);
   }
@@ -224,22 +209,7 @@ void TouchInputTask(void* pdata)
   };
 
   auto sendEvent = [&](Event e) {
-    INT8U uCOSerr;
-    // Obtain an Event* from eventHeap
-    auto event = static_cast<Event*>(OSMemGet(eventHeap, &uCOSerr));
-    if (uCOSerr != OS_ERR_NONE) {
-      PrintWithBuf(buf, sizeof(buf), "TouchInputTask: eventHeap failure %d\n", uCOSerr);
-      while (1);
-    }
-
-    // Prepare event
-    *event = e;
-
-    // Post event to eventQueue
-    uCOSerr = OSQPost(eventQueue, event);
-    if (uCOSerr == OS_ERR_Q_FULL) {
-      PrintWithBuf(buf, sizeof(buf), "TouchInputTask: Queue is full!\n");
-    }
+    eventQueue.push(e);
   };
 
   unsigned counter = TIMEOUT;   // counter for RELEASE->IDLE transition
