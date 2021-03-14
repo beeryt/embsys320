@@ -70,10 +70,8 @@ void ListMP3Files();
 void DrawLcdContents();
 
 // global song list
-#define MAX_SONGS 64
-static Song songHeapArray[MAX_SONGS];
-static OS_MEM* songHeap = NULL;
-static std::vector<Song*> songs;
+Heap<Song, 64> songHeap;
+SongList g_songs;
 
 // event queue
 Queue<Event, 4> eventQueue;
@@ -109,23 +107,17 @@ void StartupTask(void* pdata)
   InitializeLCD(lcdCtrl);
   InitializeTouch(touchCtrl);
 
-  // initialize songHeap
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializeing Song Heap\n");
-  if (songHeap == NULL) {
-    songHeap = OSMemCreate(songHeapArray, MAX_SONGS, sizeof(Song), &uCOSerr);
-    if (uCOSerr != OS_ERR_NONE) while (1);
-  }
-
-  eventQueue.initialize();
-  commandQueue.initialize();
+  // initialize heaps, queues, and mailboxes
+  uCOSerr = songHeap.initialize();
+  if (uCOSerr != OS_ERR_NONE) while (1);
+  uCOSerr = eventQueue.initialize();
+  if (uCOSerr != OS_ERR_NONE) while (1);
+  uCOSerr = commandQueue.initialize();
+  if (uCOSerr != OS_ERR_NONE) while (1);
 
   // List SD card contents
   PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
   ListMP3Files();
-  PrintWithBuf(buf, sizeof(buf), "Songs:\n");
-  for (auto it = songs.begin(); it != songs.end(); ++it) {
-    PrintWithBuf(buf, sizeof(buf), "  %s\n", (*it)->filename.c_str());
-  }
 
   // load bitmap images
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Loading bitmap icons\n");
@@ -175,9 +167,17 @@ void LcdDisplayTask(void* pdata)
       // Pop msg from eventQueue
       Event e;
       auto err = eventQueue.pop(&e);
-      if (err != OS_ERR_NONE) continue;
+      if (err != OS_ERR_NONE) {
+#ifdef DEBUG_EVENT_QUEUE
+        PrintWithBuf(buf, sizeof(buf), "eventQueue.pop ERROR: %d\n", uCOSerr);
+#endif
+        continue;
+      }
 
       // Do something with the event
+#ifdef DEBUG_EVENT_QUEUE
+      PrintWithBuf(buf, sizeof(buf), "Receiving e: %d (%d,%d)\n", e.type, e.position.x, e.position.y);
+#endif
       b.input(e);
     } while (uCOSerr == OS_ERR_NONE);
 
@@ -209,6 +209,9 @@ void TouchInputTask(void* pdata)
   };
 
   auto sendEvent = [&](Event e) {
+#ifdef DEBUG_EVENT_QUEUE
+    PrintWithBuf(buf, sizeof(buf), "Sending e: %d (%d,%d)\n", e.type, e.position.x, e.position.y);
+#endif
     eventQueue.push(e);
   };
 
@@ -263,35 +266,17 @@ void Mp3StreamTask(void* pdata)
 
     HANDLE hMp3;
     InitializeMP3(hMp3);
+    bool playing = false;
 
     while (1) {
-      for (auto it = songs.begin(); it != songs.end(); ++it) {
-        const char* filename = (*it)->filename.c_str();
-        PrintWithBuf(buf, sizeof(buf), "Begin streaming sound file: %s\n", filename);
-        Mp3StreamSDFile(hMp3, filename);
-        OSTimeDly(500);
+      if (playing) {
+        auto song = g_songs.current();
+        PrintWithBuf(buf, sizeof(buf), "Begin streaming sound file: %s\n", song->filename.c_str());
+        Mp3StreamSDFile(hMp3, song->filename.c_str());
+      } else {
+        OSTimeDly(20);
       }
     }
-}
-
-static void DrawLcdContents()
-{
-    char buf[BUFSIZE];
-    OS_CPU_SR cpu_sr;
-
-    // allow slow lower pri drawing operation to finish without preemption
-    OS_ENTER_CRITICAL();
-
-    lcdCtrl.fillScreen(ILI9341_BLACK);
-
-    // Print a message on the LCD
-    lcdCtrl.setCursor(40, 60);
-    lcdCtrl.setTextColor(ILI9341_WHITE);
-    lcdCtrl.setTextSize(2);
-    PrintToLcdWithBuf(buf, BUFSIZE, "Hello World!");
-
-    OS_EXIT_CRITICAL();
-
 }
 
 // Renders a character at the current cursor position on the LCD
@@ -335,6 +320,7 @@ void DebugSDContents() {
 
 void ListMP3FilesHelper(File dir) {
   char buf[24];
+  INT8U uCOSerr;
   if (!dir) { return; }
   while (1) {
     File entry = dir.openNextFile();
@@ -342,13 +328,10 @@ void ListMP3FilesHelper(File dir) {
     if (entry.isDirectory()) { ListMP3FilesHelper(entry); }
     else {
       if (!strstr(entry.name(), ".MP3")) { continue; }
-      // allocate space for song
-      INT8U uCOSerr;
-      auto song = static_cast<Song*>(OSMemGet(songHeap, &uCOSerr));
+      auto song = songHeap.get(&uCOSerr);
       if (uCOSerr != OS_ERR_NONE) while (1);
-      // populate song fields
       song->filename = std::string{ entry.name() };
-      songs.insert(songs.begin(), song);
+      g_songs.add(song);
       PrintWithBuf(buf, sizeof(buf), "%s\n", entry.name());
     }
     entry.close();
