@@ -129,6 +129,15 @@ void StartupTask(void* pdata)
   // List SD card contents
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Reading SD Card Contents\n");
   ReadMp3Files();
+#ifdef DEBUG_SONG_LIST
+  for (const auto& song : g_songs.list) {
+    PrintWithBuf(buf, sizeof(buf), "  %s:\n", song->filename.c_str());
+    PrintWithBuf(buf, sizeof(buf), "    title:    %s\n", song->title.c_str());
+    //PrintWithBuf(buf, sizeof(buf), "    artist:   %s\n", song->artist.c_str());
+    //PrintWithBuf(buf, sizeof(buf), "    album:    %s\n", song->album.c_str());
+    PrintWithBuf(buf, sizeof(buf), "    duration: %d\n", song->duration);
+  }
+#endif
 
   // load bitmap images
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Loading bitmap icons\n");
