@@ -429,12 +429,14 @@ void DebugSDContents() {
 size_t getDuration(const std::string& fname) {
   auto file = SD.open(fname.c_str(), O_READ);
   const int bitrate = 96000;
+  size_t duration = (file.size() * 8) / bitrate;
+#ifdef DEBUG_DURATION
   char buf[64];
+  PrintWithBuf(buf, sizeof(buf), "  duration: %d\n", duration);
   PrintWithBuf(buf, sizeof(buf), "fname: %s\n", fname.c_str());
   PrintWithBuf(buf, sizeof(buf), "  file.size(): %d\n", file.size());
   PrintWithBuf(buf, sizeof(buf), "  bitrate: %d\n", bitrate);
-  size_t duration = (file.size() * 8) / bitrate;
-  PrintWithBuf(buf, sizeof(buf), "  duration: %d\n", duration);
+#endif
   file.close();
   return duration;
 }
