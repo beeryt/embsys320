@@ -66,7 +66,7 @@ const std::vector<Task> tasks = {
 // Useful functions
 void PrintToLcdWithBuf(char *buf, int size, char *format, ...);
 void DebugSDContents();
-void ListMP3Files();
+void ReadMp3Files();
 void DrawLcdContents();
 
 // global song list
@@ -127,8 +127,8 @@ void StartupTask(void* pdata)
   if (uCOSerr != OS_ERR_NONE) while (1);
 
   // List SD card contents
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: SD Card Contents:\n");
-  ListMP3Files();
+  PrintWithBuf(buf, BUFSIZE, "StartupTask: Reading SD Card Contents\n");
+  ReadMp3Files();
 
   // load bitmap images
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Loading bitmap icons\n");
@@ -441,14 +441,13 @@ size_t getDuration(const std::string& fname) {
   return duration;
 }
 
-void ListMP3FilesHelper(File dir) {
-  char buf[24];
+void ReadMp3FilesHelper(File dir) {
   INT8U uCOSerr;
   if (!dir) { return; }
   while (1) {
     File entry = dir.openNextFile();
     if (!entry) { break; }
-    if (entry.isDirectory()) { ListMP3FilesHelper(entry); }
+    if (entry.isDirectory()) { ReadMp3FilesHelper(entry); }
     else {
       if (!strstr(entry.name(), ".MP3")) { continue; }
       auto song = songHeap.get(&uCOSerr);
@@ -456,15 +455,14 @@ void ListMP3FilesHelper(File dir) {
       song->filename = std::string{ entry.name() };
       song->duration = getDuration(entry.name());
       g_songs.add(song);
-      PrintWithBuf(buf, sizeof(buf), "%s\n", entry.name());
     }
     entry.close();
   }
 }
 
-void ListMP3Files() {
+void ReadMp3Files() {
   File dir = SD.open("/");
-  ListMP3FilesHelper(dir);
+  ReadMp3FilesHelper(dir);
   dir.close();
 }
 
