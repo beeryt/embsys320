@@ -77,8 +77,11 @@ SongList g_songs;
 Queue<Event, 4> eventQueue;
 
 // command queue
-enum class Command { PREVIOUS, PLAYPAUSE, NEXT };
+enum class Command { PREVIOUS, PLAY, PAUSE, NEXT };
 Queue<Command, 4> commandQueue;
+
+// song mailbox
+Mailbox<Song> songMbox;
 
 // Globals
 BOOLEAN nextSong = OS_FALSE;
@@ -113,6 +116,8 @@ void StartupTask(void* pdata)
   uCOSerr = eventQueue.initialize();
   if (uCOSerr != OS_ERR_NONE) while (1);
   uCOSerr = commandQueue.initialize();
+  if (uCOSerr != OS_ERR_NONE) while (1);
+  uCOSerr = songMbox.initialize();
   if (uCOSerr != OS_ERR_NONE) while (1);
 
   // List SD card contents
@@ -153,11 +158,22 @@ void LcdDisplayTask(void* pdata)
   PrintWithBuf(buf, BUFSIZE, "LcdDisplayTask: starting\n");
 
   MP3 b(lcdCtrl.width(), lcdCtrl.height());
-  b.title.setText("Kling To The Wreckage");
-  b.artist.setText("The Crystal Method");
   b.refreshLayout();
   b.setGFX(&lcdCtrl);
   lcdCtrl.fillScreen(0);
+
+  b.controls.prev.setOnClick([](){
+    commandQueue.push(Command::PREVIOUS);
+  });
+
+  b.controls.play.setOnClick([&](){
+    bool paused = b.controls.play.isPressed();
+    commandQueue.push(paused ? Command::PLAY : Command::PAUSE);
+  });
+
+  b.controls.next.setOnClick([](){
+    commandQueue.push(Command::NEXT);
+  });
 
   INT32U time = OSTimeGet();
 
@@ -180,6 +196,14 @@ void LcdDisplayTask(void* pdata)
 #endif
       b.input(e);
     } while (uCOSerr == OS_ERR_NONE);
+
+    // check for change in songMbox
+    auto song = songMbox.accept();
+    if (song) {
+      static std::string title, artist, album;
+      title = song->filename;
+      b.title.setText(title.c_str());
+    }
 
     INT32U next = OSTimeGet();
     b.process(next - time);
@@ -267,12 +291,52 @@ void Mp3StreamTask(void* pdata)
     HANDLE hMp3;
     InitializeMP3(hMp3);
     bool playing = false;
+    File currentSong;
+
+    songMbox.post(*g_songs.current());
+    bool songChanged = true;
 
     while (1) {
+      // handle command queue
+      Command c;
+      while (commandQueue.pop(&c) == OS_ERR_NONE) {
+        PrintWithBuf(buf, sizeof(buf), "Received command: %d\n", c);
+        switch (c) {
+        case Command::PREVIOUS:
+          g_songs.prev();
+          songChanged = true;
+          break;
+
+        case Command::PLAY:
+        case Command::PAUSE:
+          playing = !playing;
+          break;
+
+        case Command::NEXT:
+          g_songs.next();
+          songChanged = true;
+          break;
+        }
+      }
+
+      // update current song global
+      if (songChanged) {
+        songMbox.flush();
+        songMbox.post(*g_songs.current());
+        currentSong.close();
+        currentSong = SD.open(g_songs.current()->filename.c_str(), O_READ);
+        songChanged = false;
+      }
+
+      // stream file
       if (playing) {
         auto song = g_songs.current();
-        PrintWithBuf(buf, sizeof(buf), "Begin streaming sound file: %s\n", song->filename.c_str());
-        Mp3StreamSDFile(hMp3, song->filename.c_str());
+        if (Mp3StreamSDFilePart(hMp3, currentSong)) {
+          g_songs.next();
+          songChanged = true;
+          // TODO: behavior is different if repeat feature is added
+        }
+        OSTimeDly(1);
       } else {
         OSTimeDly(20);
       }

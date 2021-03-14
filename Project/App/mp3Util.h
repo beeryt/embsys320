@@ -9,13 +9,15 @@
 
 #ifndef __MP3UTIL_H
 #define __MP3UTIL_H
-
+#include <SD.h>
 
 PjdfErrCode Mp3GetRegister(HANDLE hMp3, INT8U *cmdInDataOut, INT32U bufLen);
 void Mp3Init(HANDLE hMp3);
 void Mp3Test(HANDLE hMp3);
 void Mp3Stream(HANDLE hMp3, INT8U *pBuf, INT32U bufLen);
 void Mp3StreamSDFile(HANDLE hMp3, const char *pFilename);
+bool Mp3StreamSDFilePart(HANDLE hMp3, File& dataFile);
+void Mp3StreamClear(HANDLE hMp3);
 
 
 #endif

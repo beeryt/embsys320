@@ -28,6 +28,19 @@ private:
   OS_EVENT* queue = nullptr;
 };
 
+template <class T>
+class Mailbox {
+public:
+  INT8U initialize();
+  T* accept();
+  INT8U post(const T&);
+  void flush();
+private:
+  bool initialized = false;
+  T data;
+  OS_EVENT* mbox = nullptr;
+};
+
 template <class T, size_t N>
 INT8U Heap<T,N>::initialize() {
   INT8U uCOSerr;
@@ -88,7 +101,7 @@ INT8U Queue<T,N>::pop(T* out) {
   INT8U uCOSerr = OS_ERR_NONE;
   // Pop element from queue
   auto msg = static_cast<T*>(OSQAccept(queue, &uCOSerr));
-  if (!msg) { return uCOSerr; }
+  if (!msg) { return OS_ERR_Q_EMPTY; }
 
   // Copy element to output
   if (out) *out = *msg;
@@ -100,3 +113,31 @@ INT8U Queue<T,N>::pop(T* out) {
   }
   return uCOSerr;
 }
+
+#ifdef MBOX_IS_QUEUE
+#else
+template <class T>
+INT8U Mailbox<T>::initialize() {
+  if (initialized) return OS_ERR_NONE;
+
+  mbox = OSMboxCreate(nullptr);
+  initialized = true;
+  return OS_ERR_NONE;
+}
+
+template <class T>
+T* Mailbox<T>::accept() {
+  return static_cast<T*>(OSMboxAccept(mbox));
+}
+
+template <class T>
+INT8U Mailbox<T>::post(const T& cpy) {
+  data = cpy;
+  return OSMboxPost(mbox, &data);
+}
+
+template <class T>
+void Mailbox<T>::flush() {
+  accept();
+}
+#endif

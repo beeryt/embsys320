@@ -41,6 +41,37 @@ static void Mp3StreamInit(HANDLE hMp3)
     Ioctl(hMp3, PJDF_CTRL_MP3_SELECT_DATA, 0, 0);
 }
 
+void Mp3StreamClear(HANDLE hMp3) {
+    // reset for next song
+    dataFile.seek(0);
+    Ioctl(hMp3, PJDF_CTRL_MP3_SELECT_COMMAND, 0, 0);
+    INT32U length = BspMp3SoftResetLen;
+    Write(hMp3, (void*)BspMp3SoftReset, &length);
+}
+
+// Mp3StreamSDFilePart
+bool Mp3StreamSDFilePart(HANDLE hMp3, File& dataFile) {
+
+  if (dataFile.position() == 0) {
+    Mp3StreamInit(hMp3);
+  }
+
+  INT8U mp3Buf[MP3_DECODER_BUF_SIZE];
+  INT32U iBufPos = 0;
+  if (dataFile.available())
+  {
+    iBufPos = 0;
+    while (dataFile.available() && iBufPos < MP3_DECODER_BUF_SIZE) {
+      mp3Buf[iBufPos++] = dataFile.read();
+    }
+    Write(hMp3, mp3Buf, &iBufPos);
+    return false;
+  } else {
+    Mp3StreamClear(hMp3);
+    return true;
+  }
+}
+
 // Mp3StreamSDFile
 // Streams the given file from the SD card to the given MP3 decoder.
 // hMP3: an open handle to the MP3 decoder
