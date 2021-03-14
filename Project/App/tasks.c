@@ -82,6 +82,8 @@ Queue<Command, 4> commandQueue;
 
 // song mailbox
 Mailbox<Song> songMbox;
+Mailbox<int> progressMbox;
+Mailbox<int> durationMbox;
 
 // Globals
 BOOLEAN nextSong = OS_FALSE;
@@ -118,6 +120,10 @@ void StartupTask(void* pdata)
   uCOSerr = commandQueue.initialize();
   if (uCOSerr != OS_ERR_NONE) while (1);
   uCOSerr = songMbox.initialize();
+  if (uCOSerr != OS_ERR_NONE) while (1);
+  uCOSerr = progressMbox.initialize();
+  if (uCOSerr != OS_ERR_NONE) while (1);
+  uCOSerr = durationMbox.initialize();
   if (uCOSerr != OS_ERR_NONE) while (1);
 
   // List SD card contents
@@ -203,6 +209,16 @@ void LcdDisplayTask(void* pdata)
       static std::string title, artist, album;
       title = song->filename;
       b.title.setText(title.c_str());
+    }
+
+    auto duration = durationMbox.accept();
+    if (duration) {
+      b.playback.setDuration(*duration);
+    }
+
+    auto progress = progressMbox.accept();
+    if (progress) {
+      b.playback.setProgress(*progress);
     }
 
     INT32U next = OSTimeGet();
@@ -293,6 +309,7 @@ void Mp3StreamTask(void* pdata)
     bool playing = false;
     File currentSong;
 
+    INT32U songProgress = 0;
     songMbox.post(*g_songs.current());
     bool songChanged = true;
 
@@ -300,7 +317,9 @@ void Mp3StreamTask(void* pdata)
       // handle command queue
       Command c;
       while (commandQueue.pop(&c) == OS_ERR_NONE) {
+#ifdef DEBUG_COMMAND_QUEUE
         PrintWithBuf(buf, sizeof(buf), "Received command: %d\n", c);
+#endif
         switch (c) {
         case Command::PREVIOUS:
           g_songs.prev();
@@ -325,11 +344,36 @@ void Mp3StreamTask(void* pdata)
         songMbox.post(*g_songs.current());
         currentSong.close();
         currentSong = SD.open(g_songs.current()->filename.c_str(), O_READ);
+        songProgress = 0;
+        progressMbox.flush();
+        progressMbox.post(songProgress);
+        int duration = (currentSong.size() * 8) / 96000;
+        durationMbox.flush();
+        durationMbox.post(duration);
         songChanged = false;
+      }
+
+      static auto last_time = OSTimeGet();
+      static bool last_playing = !playing;
+      if (last_playing != playing) {
+        if (playing) last_time = OSTimeGet();
+        last_playing = playing;
+      }
+
+      auto elapsed = songProgress / 1000;
+      static auto lastElapsed = elapsed;
+      if (lastElapsed != elapsed) {
+        progressMbox.flush();
+        progressMbox.post(elapsed);
       }
 
       // stream file
       if (playing) {
+        // advance progress
+        auto this_time = OSTimeGet();
+        songProgress += this_time - last_time;
+        last_time = this_time;
+        // play song chunk
         auto song = g_songs.current();
         if (Mp3StreamSDFilePart(hMp3, currentSong)) {
           g_songs.next();
@@ -382,6 +426,19 @@ void DebugSDContents() {
   DebugSDContentsHelper(dir);
 }
 
+size_t getDuration(const std::string& fname) {
+  auto file = SD.open(fname.c_str(), O_READ);
+  const int bitrate = 96000;
+  char buf[64];
+  PrintWithBuf(buf, sizeof(buf), "fname: %s\n", fname.c_str());
+  PrintWithBuf(buf, sizeof(buf), "  file.size(): %d\n", file.size());
+  PrintWithBuf(buf, sizeof(buf), "  bitrate: %d\n", bitrate);
+  size_t duration = (file.size() * 8) / bitrate;
+  PrintWithBuf(buf, sizeof(buf), "  duration: %d\n", duration);
+  file.close();
+  return duration;
+}
+
 void ListMP3FilesHelper(File dir) {
   char buf[24];
   INT8U uCOSerr;
@@ -395,6 +452,7 @@ void ListMP3FilesHelper(File dir) {
       auto song = songHeap.get(&uCOSerr);
       if (uCOSerr != OS_ERR_NONE) while (1);
       song->filename = std::string{ entry.name() };
+      song->duration = getDuration(entry.name());
       g_songs.add(song);
       PrintWithBuf(buf, sizeof(buf), "%s\n", entry.name());
     }
@@ -461,7 +519,7 @@ Bitmap loadBitmap(const char* filename) {
   // single whitespace between header and the promised data
   assert(isspace(file.read()));
 
-#if 1
+#ifdef DEBUG_loadBitmap
   char buf[80];
   PrintWithBuf(buf, sizeof(buf), "%s\n  width: %d\n  height: %d\n  maxval: %d\n",
                filename, width, height, maxval);
