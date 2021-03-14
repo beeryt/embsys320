@@ -30,6 +30,7 @@ INT8U Queue<T,N>::initialize() {
   queue = OSQCreate((void**)&queueData[0], N);
   if (queue == NULL) return OS_ERR_PEVENT_NULL;
 
+  initialized = true;
   return OS_ERR_NONE;
 }
 

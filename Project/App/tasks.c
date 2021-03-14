@@ -76,7 +76,7 @@ static OS_MEM* songHeap = NULL;
 static std::vector<Song*> songs;
 
 // event queue
-Queue<Event, 32> eventQueue;
+Queue<Event, 4> eventQueue;
 
 // command queue
 enum class Command { PREVIOUS, PLAYPAUSE, NEXT };
@@ -178,11 +178,11 @@ void LcdDisplayTask(void* pdata)
       if (err != OS_ERR_NONE) continue;
 
       // Do something with the event
-      //b.input(*msg);
+      b.input(e);
     } while (uCOSerr == OS_ERR_NONE);
 
     INT32U next = OSTimeGet();
-    //b.process(next - time);
+    b.process(next - time);
     time = next;
     OSTimeDly(20);
   }
