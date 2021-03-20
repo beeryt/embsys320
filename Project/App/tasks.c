@@ -215,9 +215,15 @@ void LcdDisplayTask(void* pdata)
     // check for change in songMbox
     auto song = songMbox.accept();
     if (song) {
+      // copy strings because mailbox may get rewritten
       static std::string title, artist, album;
-      title = song->filename;
+      title = song->info.title;
+      artist = song->info.artist;
+      album = song->info.album;
+      // updaate GUI elements
       b.title.setText(title.c_str());
+      b.artist.setText(artist.c_str());
+      //b.album.setText(album.c_str());
     }
 
     auto duration = durationMbox.accept();
@@ -450,6 +456,13 @@ size_t getDuration(const std::string& fname) {
   return duration;
 }
 
+void readId3Tag(File& file, Song* song){
+  // be cautious of compiler-added padding to the Song::Info struct
+  file.seek(file.size() - sizeof(Song::Info));
+  // read the ID3 tag into song->info
+  int s = file.read(&song->info, sizeof(Song::Info));
+}
+
 void ReadMp3FilesHelper(File dir) {
   INT8U uCOSerr;
   if (!dir) { return; }
@@ -463,6 +476,7 @@ void ReadMp3FilesHelper(File dir) {
       if (uCOSerr != OS_ERR_NONE) while (1);
       song->filename = std::string{ entry.name() };
       song->duration = getDuration(entry.name());
+      readId3Tag(entry, song);
       g_songs.add(song);
     }
     entry.close();
