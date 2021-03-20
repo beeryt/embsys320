@@ -103,16 +103,11 @@ Bitmap art_texture;
 void StartupTask(void* pdata)
 {
   INT8U uCOSerr;
-  char buf[BUFSIZE];
-
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: Begin\n");
 
   // Start the system tick
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: Starting timer tick\n");
   SetSysTick(OS_TICKS_PER_SEC);
 
   // Initialize hardware drivers
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: Initializing Hardware\n");
   InitializeSD();
   InitializeLCD(lcdCtrl);
   InitializeTouch(touchCtrl);
@@ -131,8 +126,7 @@ void StartupTask(void* pdata)
   uCOSerr = durationMbox.initialize();
   if (uCOSerr != OS_ERR_NONE) while (1);
 
-  // List SD card contents
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: Reading SD Card Contents\n");
+  // Read SD card contents
   ReadMp3Files();
 #ifdef DEBUG_SONG_LIST
   for (const auto& song : g_songs.list) {
@@ -145,7 +139,6 @@ void StartupTask(void* pdata)
 #endif
 
   // load bitmap images
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: Loading bitmap icons\n");
   play_texture = loadBitmap("icon/play.pgm");
   pause_texture = loadBitmap("icon/pause.pgm");
   prev_texture = loadBitmap("icon/prev.pgm");
@@ -153,8 +146,6 @@ void StartupTask(void* pdata)
   art_texture = loadBitmap("icon/music.pgm");
 
   // Create the test tasks
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
-
   OSStatInit();
 
   // The maximum number of tasks the application can have is defined by OS_MAX_TASKS in os_cfg.h
@@ -163,7 +154,6 @@ void StartupTask(void* pdata)
   }
 
   // Delete ourselves, letting the work be done in the new tasks.
-  PrintWithBuf(buf, BUFSIZE, "StartupTask: deleting self\n");
   OSTaskDel(OS_PRIO_SELF);
 }
 
@@ -175,8 +165,6 @@ void StartupTask(void* pdata)
 void LcdDisplayTask(void* pdata)
 {
   INT8U uCOSerr;
-  char buf[BUFSIZE];
-  PrintWithBuf(buf, BUFSIZE, "LcdDisplayTask: starting\n");
 
   MP3 b(lcdCtrl.width(), lcdCtrl.height());
   b.refreshLayout();
@@ -253,8 +241,6 @@ void LcdDisplayTask(void* pdata)
 void TouchInputTask(void* pdata)
 {
   const unsigned TIMEOUT = 4;
-  char buf[BUFSIZE];
-  PrintWithBuf(buf, BUFSIZE, "TouchInputTask: starting\n");
 
   enum State {
     IDLE,
@@ -323,8 +309,6 @@ void TouchInputTask(void* pdata)
 ************************************************************************************/
 void Mp3StreamTask(void* pdata)
 {
-    char buf[BUFSIZE];
-    PrintWithBuf(buf, BUFSIZE, "Mp3StreamTask: starting\n");
 
     HANDLE hMp3;
     InitializeMP3(hMp3);
