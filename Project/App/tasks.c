@@ -86,8 +86,13 @@ Mailbox<int> progressMbox;
 Mailbox<int> durationMbox;
 
 // Globals
-BOOLEAN nextSong = OS_FALSE;
-Bitmap play_texture, prev_texture, next_texture, pause_texture;
+bool isPlaying = false;
+bool nextSong = OS_FALSE;
+Bitmap play_texture;
+Bitmap prev_texture;
+Bitmap next_texture;
+Bitmap pause_texture;
+Bitmap art_texture;
 
 /************************************************************************************
 
@@ -132,9 +137,9 @@ void StartupTask(void* pdata)
 #ifdef DEBUG_SONG_LIST
   for (const auto& song : g_songs.list) {
     PrintWithBuf(buf, sizeof(buf), "  %s:\n", song->filename.c_str());
-    PrintWithBuf(buf, sizeof(buf), "    title:    %s\n", song->title.c_str());
-    //PrintWithBuf(buf, sizeof(buf), "    artist:   %s\n", song->artist.c_str());
-    //PrintWithBuf(buf, sizeof(buf), "    album:    %s\n", song->album.c_str());
+    PrintWithBuf(buf, sizeof(buf), "    title:    %s\n", song->info.title);
+    PrintWithBuf(buf, sizeof(buf), "    artist:   %s\n", song->info.artist);
+    PrintWithBuf(buf, sizeof(buf), "    album:    %s\n", song->info.album);
     PrintWithBuf(buf, sizeof(buf), "    duration: %d\n", song->duration);
   }
 #endif
@@ -145,6 +150,7 @@ void StartupTask(void* pdata)
   pause_texture = loadBitmap("icon/pause.pgm");
   prev_texture = loadBitmap("icon/prev.pgm");
   next_texture = loadBitmap("icon/next.pgm");
+  art_texture = loadBitmap("icon/music.pgm");
 
   // Create the test tasks
   PrintWithBuf(buf, BUFSIZE, "StartupTask: Creating the application tasks\n");
@@ -158,7 +164,7 @@ void StartupTask(void* pdata)
 
   // Delete ourselves, letting the work be done in the new tasks.
   PrintWithBuf(buf, BUFSIZE, "StartupTask: deleting self\n");
-      OSTaskDel(OS_PRIO_SELF);
+  OSTaskDel(OS_PRIO_SELF);
 }
 
 /************************************************************************************
@@ -223,7 +229,7 @@ void LcdDisplayTask(void* pdata)
       // updaate GUI elements
       b.title.setText(title.c_str());
       b.artist.setText(artist.c_str());
-      //b.album.setText(album.c_str());
+      b.album.setText(album.c_str());
     }
 
     auto duration = durationMbox.accept();
@@ -237,7 +243,8 @@ void LcdDisplayTask(void* pdata)
     }
 
     INT32U next = OSTimeGet();
-    b.process(next - time);
+    INT32U delta = next - time;
+    b.process(delta);
     time = next;
     OSTimeDly(20);
   }
@@ -321,7 +328,6 @@ void Mp3StreamTask(void* pdata)
 
     HANDLE hMp3;
     InitializeMP3(hMp3);
-    bool playing = false;
     File currentSong;
 
     INT32U songProgress = 0;
@@ -343,7 +349,7 @@ void Mp3StreamTask(void* pdata)
 
         case Command::PLAY:
         case Command::PAUSE:
-          playing = !playing;
+          isPlaying = !isPlaying;
           break;
 
         case Command::NEXT:
@@ -369,10 +375,10 @@ void Mp3StreamTask(void* pdata)
       }
 
       static auto last_time = OSTimeGet();
-      static bool last_playing = !playing;
-      if (last_playing != playing) {
-        if (playing) last_time = OSTimeGet();
-        last_playing = playing;
+      static bool last_playing = !isPlaying;
+      if (last_playing != isPlaying) {
+        if (isPlaying) last_time = OSTimeGet();
+        last_playing = isPlaying;
       }
 
       auto elapsed = songProgress / 1000;
@@ -383,7 +389,7 @@ void Mp3StreamTask(void* pdata)
       }
 
       // stream file
-      if (playing) {
+      if (isPlaying) {
         // advance progress
         auto this_time = OSTimeGet();
         songProgress += this_time - last_time;
@@ -400,26 +406,6 @@ void Mp3StreamTask(void* pdata)
         OSTimeDly(20);
       }
     }
-}
-
-// Renders a character at the current cursor position on the LCD
-static void PrintCharToLcd(char c)
-{
-    lcdCtrl.write(c);
-}
-
-/************************************************************************************
-
-   Print a formated string with the given buffer to LCD.
-   Each task should use its own buffer to prevent data corruption.
-
-************************************************************************************/
-void PrintToLcdWithBuf(char *buf, int size, char *format, ...)
-{
-    va_list args;
-    va_start(args, format);
-    PrintToDeviceWithBuf(PrintCharToLcd, buf, size, format, args);
-    va_end(args);
 }
 
 void DebugSDContentsHelper(File dir, int level = 0) {
@@ -461,6 +447,12 @@ void readId3Tag(File& file, Song* song){
   file.seek(file.size() - sizeof(Song::Info));
   // read the ID3 tag into song->info
   int s = file.read(&song->info, sizeof(Song::Info));
+#define DEFAULT_SONG_DETAILS
+#ifdef DEFAULT_SONG_DETAILS
+  if (strlen(song->info.title) == 0) { strncpy(song->info.title, "Unknown Title", sizeof(Song::Info::title)); }
+  if (strlen(song->info.artist) == 0) { strncpy(song->info.artist, "Unknown Artist", sizeof(Song::Info::artist)); }
+  if (strlen(song->info.album) == 0) { strncpy(song->info.album, "Unknown Album", sizeof(Song::Info::album)); }
+#endif
 }
 
 void ReadMp3FilesHelper(File dir) {
@@ -489,23 +481,21 @@ void ReadMp3Files() {
   dir.close();
 }
 
-uint8_t bitmapHeapArr[64*64*4];
+uint8_t bitmapHeapArr[64*64*5];
 OS_MEM* bitmapHeap = NULL;
 
 Bitmap loadBitmap(const char* filename) {
   INT8U uCOSerr;
   if (bitmapHeap == NULL) {
-    bitmapHeap = OSMemCreate(bitmapHeapArr, 4, 64*64, &uCOSerr);
+    bitmapHeap = OSMemCreate(bitmapHeapArr, 5, 64*64, &uCOSerr);
     if (uCOSerr != OS_ERR_NONE) while (1);
   }
   Bitmap out;
-  int ret;
-
   auto file = SD.open(filename);
 
   // look for Netpbm PGM magic
   uint16_t magic;
-  ret = file.read(&magic, sizeof(magic));
+  int ret = file.read(&magic, sizeof(magic));
   magic = ntoh(magic);
   if (magic != 20533) return out;
 
