@@ -352,7 +352,7 @@ void Mp3StreamTask(void* pdata)
         songProgress = 0;
         progressMbox.flush();
         progressMbox.post(songProgress);
-        int duration = (currentSong.size() * 8) / 96000;
+        int duration = (currentSong.size() * 8) / 192000;
         durationMbox.flush();
         durationMbox.post(duration);
         songChanged = false;
@@ -411,21 +411,6 @@ void DebugSDContents() {
   DebugSDContentsHelper(dir);
 }
 
-size_t getDuration(const std::string& fname) {
-  auto file = SD.open(fname.c_str(), O_READ);
-  const int bitrate = 96000;
-  size_t duration = (file.size() * 8) / bitrate;
-#ifdef DEBUG_DURATION
-  char buf[64];
-  PrintWithBuf(buf, sizeof(buf), "  duration: %d\n", duration);
-  PrintWithBuf(buf, sizeof(buf), "fname: %s\n", fname.c_str());
-  PrintWithBuf(buf, sizeof(buf), "  file.size(): %d\n", file.size());
-  PrintWithBuf(buf, sizeof(buf), "  bitrate: %d\n", bitrate);
-#endif
-  file.close();
-  return duration;
-}
-
 void readId3Tag(File& file, Song* song){
   // be cautious of compiler-added padding to the Song::Info struct
   file.seek(file.size() - sizeof(Song::Info));
@@ -451,7 +436,6 @@ void ReadMp3FilesHelper(File dir) {
       auto song = songHeap.get(&uCOSerr);
       if (uCOSerr != OS_ERR_NONE) while (1);
       song->filename = std::string{ entry.name() };
-      song->duration = getDuration(entry.name());
       readId3Tag(entry, song);
       g_songs.add(song);
     }
